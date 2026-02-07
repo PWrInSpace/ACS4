@@ -1,9 +1,9 @@
 # Private notes
 
-
 # Build output
 build/
 cmake-build-*/
+compile_commands.json
 
 # IDE
 .vscode/launch.json

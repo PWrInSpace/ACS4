@@ -15,6 +15,7 @@
  */
 
 #include "ch.h"
+
 #include "hal.h"
 
 #include <chprintf.h>
@@ -24,11 +25,14 @@
 /*---------------------------------------------------------------------------*/
 
 static THD_WORKING_AREA(waBlinker, 256);
-static THD_FUNCTION(Blinker, arg) {
+
+static THD_FUNCTION(Blinker, arg)
+{
     (void)arg;
     chRegSetThreadName("blinker");
 
-    while (true) {
+    while (true)
+    {
         palSetLine(LINE_LED1);
         chThdSleepMilliseconds(100);
         palClearLine(LINE_LED1);
@@ -46,16 +50,19 @@ static THD_FUNCTION(Blinker, arg) {
 /*---------------------------------------------------------------------------*/
 
 static THD_WORKING_AREA(waHeartbeat, 512);
-static THD_FUNCTION(Heartbeat, arg) {
+
+static THD_FUNCTION(Heartbeat, arg)
+{
     (void)arg;
     chRegSetThreadName("heartbeat");
 
-    BaseSequentialStream *serial = (BaseSequentialStream *)&SD3;
-    uint32_t counter = 0;
+    BaseSequentialStream *serial  = (BaseSequentialStream *)&SD3;
+    uint32_t              counter = 0;
 
-    while (true) {
+    while (true)
+    {
         systime_t now = chVTGetSystemTimeX();
-        uint32_t ms = (uint32_t)chTimeI2MS(now);
+        uint32_t  ms  = (uint32_t)chTimeI2MS(now);
 
         chprintf(serial, "[%8lu ms] ACS4 heartbeat #%lu\r\n", ms, counter++);
         chThdSleepMilliseconds(1000);
@@ -66,8 +73,8 @@ static THD_FUNCTION(Heartbeat, arg) {
 /* Application entry point                                                   */
 /*---------------------------------------------------------------------------*/
 
-int main(void) {
-
+int main(void)
+{
     /* HAL initialization, this also initializes the configured device
      * drivers and performs the board-specific initializations. */
     halInit();
@@ -87,19 +94,21 @@ int main(void) {
     chprintf(serial, "  ACS4 Flight Computer\r\n");
     chprintf(serial, "  Target: NUCLEO-H723ZG (Cortex-M7)\r\n");
     chprintf(serial, "  ChibiOS/RT %s\r\n", CH_KERNEL_VERSION);
-    chprintf(serial, "  System clock: %lu MHz\r\n",
-             STM32_SYS_CK / 1000000UL);
+    chprintf(serial, "  System clock: %lu MHz\r\n", STM32_SYS_CK / 1000000UL);
     chprintf(serial, "========================================\r\n");
     chprintf(serial, "\r\n");
 
     /* Create worker threads. */
-    chThdCreateStatic(waBlinker, sizeof(waBlinker),
-                      NORMALPRIO, Blinker, NULL);
-    chThdCreateStatic(waHeartbeat, sizeof(waHeartbeat),
-                      NORMALPRIO + 1, Heartbeat, NULL);
+    chThdCreateStatic(waBlinker, sizeof(waBlinker), NORMALPRIO, Blinker, NULL);
+    chThdCreateStatic(waHeartbeat,
+                      sizeof(waHeartbeat),
+                      NORMALPRIO + 1,
+                      Heartbeat,
+                      NULL);
 
     /* main() becomes the idle thread. */
-    while (true) {
+    while (true)
+    {
         chThdSleepMilliseconds(1000);
     }
 }

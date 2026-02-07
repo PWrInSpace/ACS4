@@ -70,3 +70,25 @@ ls /dev/ttyACM*
 # Read output
 stty -F /dev/ttyACM0 115200 raw -echo && cat /dev/ttyACM0
 ```
+
+
+### Code Style
+
+The project enforces a strict `.clang-format`.
+
+Install clang-format:
+```bash
+sudo apt install clang-format
+```
+
+Format all source files:
+```bash
+clang-format -i src/**/*.c src/**/*.h
+```
+
+Check without modifying:
+```bash
+clang-format --dry-run --Werror src/**/*.c src/**/*.h
+```
+
+> **Rule:** All code pushed to `main` must pass `clang-format --Werror`. Format before committing.
