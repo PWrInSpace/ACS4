@@ -17,11 +17,30 @@ project(acs4
 
 # ── Paths ─────────────────────────────────────────────────────────────────
 set(CHIBIOS ${CMAKE_CURRENT_SOURCE_DIR}/lib/chibios)
-set(CONFDIR ${CMAKE_CURRENT_SOURCE_DIR}/cfg)
 
-# ── Linker script ─────────────────────────────────────────────────────────
-set(LINKER_SCRIPT
-    ${CHIBIOS}/os/common/startup/ARMCMx/compilers/GCC/ld/STM32H723xG_ITCM64k.ld)
+# ── Target board selection ────────────────────────────────────────────────
+# NUCLEO_H723 = NUCLEO-144 dev board (STM32H723ZGT6)
+# CUSTOM_H743 = Production PCB       (STM32H743VIT6)
+set(ACS4_TARGET "NUCLEO_H723" CACHE STRING "Target board: NUCLEO_H723 | CUSTOM_H743")
+set_property(CACHE ACS4_TARGET PROPERTY STRINGS NUCLEO_H723 CUSTOM_H743)
+
+if(ACS4_TARGET STREQUAL "NUCLEO_H723")
+    message(STATUS "Target: NUCLEO-144 H723ZG (dev)")
+    set(LINKER_SCRIPT
+        ${CHIBIOS}/os/common/startup/ARMCMx/compilers/GCC/ld/STM32H723xG_ITCM64k.ld)
+    set(BOARD_DIR  ${CHIBIOS}/os/hal/boards/ST_NUCLEO144_H723ZG)
+    set(CONFDIR    ${CMAKE_CURRENT_SOURCE_DIR}/cfg/nucleo_h723)
+    set(MCU_DEFINE STM32H723xx)
+elseif(ACS4_TARGET STREQUAL "CUSTOM_H743")
+    message(STATUS "Target: ACS4 custom PCB H743VI (prod)")
+    set(LINKER_SCRIPT
+        ${CHIBIOS}/os/common/startup/ARMCMx/compilers/GCC/ld/STM32H743xI.ld)
+    set(BOARD_DIR  ${CMAKE_CURRENT_SOURCE_DIR}/cfg/boards/ACS4_H743)
+    set(CONFDIR    ${CMAKE_CURRENT_SOURCE_DIR}/cfg/custom_h743)
+    set(MCU_DEFINE STM32H743xx)
+else()
+    message(FATAL_ERROR "Unknown ACS4_TARGET '${ACS4_TARGET}'. Use NUCLEO_H723 or CUSTOM_H743.")
+endif()
 
 # =============================================================================
 # ChibiOS Sources
@@ -80,9 +99,9 @@ set(CHIBIOS_HAL_PLATFORM_C
     ${CHIBIOS}/os/hal/ports/STM32/LLD/USARTv3/hal_serial_lld.c
 )
 
-# ── HAL board ─────────────────────────────────────────────────────────────
+# ── HAL board (selected by ACS4_TARGET) ──────────────────────────────────
 set(CHIBIOS_BOARD_C
-    ${CHIBIOS}/os/hal/boards/ST_NUCLEO144_H723ZG/board.c
+    ${BOARD_DIR}/board.c
 )
 
 # ── HAL OSAL ──────────────────────────────────────────────────────────────
@@ -161,7 +180,7 @@ set(CHIBIOS_INCLUDE_DIRS
 
     # HAL
     ${CHIBIOS}/os/hal/include
-    ${CHIBIOS}/os/hal/boards/ST_NUCLEO144_H723ZG
+    ${BOARD_DIR}
     ${CHIBIOS}/os/hal/osal/rt-nil
     ${CHIBIOS}/os/hal/ports/common/ARMCMx
     ${CHIBIOS}/os/hal/ports/STM32/STM32H7xx
