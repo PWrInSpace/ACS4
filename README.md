@@ -26,7 +26,8 @@ sudo apt install make cmake
 ```bash
 git clone --recursive https://github.com/PWrInSpace/ACS4.git
 cd ACS4
-make -j$(nproc)
+cmake -B build
+cmake --build build -j$(nproc)
 ```
 
 Output: `build/acs4.elf`, `build/acs4.bin`, `build/acs4.hex`.
@@ -38,18 +39,10 @@ Output: `build/acs4.elf`, `build/acs4.bin`, `build/acs4.hex`.
 
 ### Flash
 
-#### Option A: OpenOCD + ST-Link (native Linux)
-
 Connect the NUCLEO-H723ZG via USB, then:
 
 ```bash
-make flash
-```
-
-This runs:
-```bash
-openocd -f interface/stlink.cfg -f target/stm32h7x.cfg \
-        -c "program build/acs4.elf verify reset exit"
+cmake --build build --target flash
 ```
 
 If you get a permission error, add udev rules:
