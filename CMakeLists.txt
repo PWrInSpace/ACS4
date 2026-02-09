@@ -151,11 +151,21 @@ set(CHIBIOS_OSLIB_C
     ${CHIBIOS}/os/oslib/src/chdelegates.c
 )
 
+# ── ChibiOS Shell ("various" module) ──────────────────────────────────
+set(CHIBIOS_SHELL_C
+    ${CHIBIOS}/os/various/shell/shell.c
+    ${CHIBIOS}/os/various/shell/shell_cmd.c
+)
+
 # =============================================================================
 # Application Sources
 # =============================================================================
 set(APP_SOURCES
     src/main.cpp
+    src/system/debug_shell.cpp
+    src/system/error_handler.cpp
+    src/system/params.cpp
+    src/system/watchdog.cpp
 )
 
 # =============================================================================
@@ -211,6 +221,9 @@ set(CHIBIOS_INCLUDE_DIRS
     # Streams (chprintf)
     ${CHIBIOS}/os/hal/lib/streams
 
+    # Shell
+    ${CHIBIOS}/os/various/shell
+
     # RT kernel
     ${CHIBIOS}/os/rt/include
 
@@ -239,12 +252,17 @@ add_executable(${PROJECT_NAME}
     ${CHIBIOS_STREAMS_C}
     ${CHIBIOS_RT_C}
     ${CHIBIOS_OSLIB_C}
-    # C — Application
+    # C — ChibiOS Shell
+    ${CHIBIOS_SHELL_C}
+    # C++ — Application
     ${APP_SOURCES}
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${CHIBIOS_INCLUDE_DIRS})
-target_compile_definitions(${PROJECT_NAME} PRIVATE CORTEX_USE_FPU=TRUE)
+target_compile_definitions(${PROJECT_NAME} PRIVATE
+    CORTEX_USE_FPU=TRUE
+    SHELL_CONFIG_FILE=TRUE
+)
 
 # ── Compiler flags ────────────────────────────────────────────────────────
 target_compile_options(${PROJECT_NAME} PRIVATE
@@ -265,6 +283,7 @@ set_source_files_properties(
     ${CHIBIOS_HAL_C} ${CHIBIOS_HAL_PLATFORM_C} ${CHIBIOS_BOARD_C}
     ${CHIBIOS_OSAL_C} ${CHIBIOS_STREAMS_C} ${CHIBIOS_RT_C}
     ${CHIBIOS_OSLIB_C}
+    ${CHIBIOS_SHELL_C}
     PROPERTIES COMPILE_OPTIONS "-Wstrict-prototypes"
 )
 
