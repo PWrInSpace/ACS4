@@ -14,11 +14,12 @@
  *   RX — PD9
  */
 
+extern "C"
+{
 #include "ch.h"
-
 #include "hal.h"
-
 #include <chprintf.h>
+}
 
 /*---------------------------------------------------------------------------*/
 /* LED blinker thread                                                        */
@@ -56,7 +57,7 @@ static THD_FUNCTION(Heartbeat, arg)
     (void)arg;
     chRegSetThreadName("heartbeat");
 
-    BaseSequentialStream *serial  = (BaseSequentialStream *)&SD3;
+    auto *serial  = reinterpret_cast<BaseSequentialStream *>(&SD3);
     uint32_t              counter = 0;
 
     while (true)
@@ -88,7 +89,7 @@ int main(void)
     sdStart(&SD3, NULL);
 
     /* Welcome banner. */
-    BaseSequentialStream *serial = (BaseSequentialStream *)&SD3;
+    auto *serial = reinterpret_cast<BaseSequentialStream *>(&SD3);
     chprintf(serial, "\r\n");
     chprintf(serial, "========================================\r\n");
     chprintf(serial, "  ACS4 Flight Computer\r\n");

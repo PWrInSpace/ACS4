@@ -12,7 +12,7 @@ set(CMAKE_TOOLCHAIN_FILE
 
 project(acs4
     VERSION   0.1.0
-    LANGUAGES C ASM
+    LANGUAGES C CXX ASM
 )
 
 # ── Paths ─────────────────────────────────────────────────────────────────
@@ -155,7 +155,7 @@ set(CHIBIOS_OSLIB_C
 # Application Sources
 # =============================================================================
 set(APP_SOURCES
-    src/main.c
+    src/main.cpp
 )
 
 # =============================================================================
@@ -256,8 +256,20 @@ target_compile_options(${PROJECT_NAME} PRIVATE
     -fdata-sections
     -fno-common
     -flto=auto
-    -Wall -Wextra -Wundef -Wstrict-prototypes
+    -Wall -Wextra -Wundef
 )
+
+# ── C-only flags (ChibiOS is pure C) ─────────────────────────────────────
+set_source_files_properties(
+    ${CHIBIOS_STARTUP_C} ${CHIBIOS_PORT_C} ${CHIBIOS_OOP_C}
+    ${CHIBIOS_HAL_C} ${CHIBIOS_HAL_PLATFORM_C} ${CHIBIOS_BOARD_C}
+    ${CHIBIOS_OSAL_C} ${CHIBIOS_STREAMS_C} ${CHIBIOS_RT_C}
+    ${CHIBIOS_OSLIB_C}
+    PROPERTIES COMPILE_OPTIONS "-Wstrict-prototypes"
+)
+
+# ── C++ flags (application code) ─────────────────────────────────────────
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-exceptions -fno-rtti -fno-threadsafe-statics")
 
 # ── ASM flags (suppress C warnings for .S files) ─────────────────────────
 set_source_files_properties(
@@ -285,6 +297,9 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
     SUFFIX ".elf"
     C_STANDARD 17
     C_STANDARD_REQUIRED ON
+    CXX_STANDARD 17
+    CXX_STANDARD_REQUIRED ON
+    CXX_EXTENSIONS OFF
 )
 
 # =============================================================================
