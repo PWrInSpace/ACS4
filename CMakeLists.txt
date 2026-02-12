@@ -165,6 +165,7 @@ set(APP_SOURCES
     src/system/debug_shell.cpp
     src/system/error_handler.cpp
     src/system/params.cpp
+    src/system/syscalls.c
     src/system/watchdog.cpp
 )
 
