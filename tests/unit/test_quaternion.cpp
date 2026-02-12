@@ -22,8 +22,9 @@ using namespace acs::nav;
 
 /* ── Helpers ─────────────────────────────────────────────────────────────── */
 
-static constexpr float DEG2RAD = static_cast<float>(M_PI) / 180.0f;
-static constexpr float RAD2DEG = 180.0f / static_cast<float>(M_PI);
+static constexpr float PI      = 3.14159265358979323846f;
+static constexpr float DEG2RAD = PI / 180.0f;
+static constexpr float RAD2DEG = 180.0f / PI;
 static constexpr float TOL     = 1e-5f;
 static constexpr float TOL_DEG = 0.1f * DEG2RAD;   /* 0.1° in rad */
 
@@ -163,7 +164,7 @@ TEST(QuatFromAxisAngle, ZeroAxisIsIdentity)
 
 TEST(QuatFromAxisAngle, OneEightyDeg)
 {
-    Quat q = quat_from_axis_angle(Vec3::UnitX(), static_cast<float>(M_PI));
+    Quat q = quat_from_axis_angle(Vec3::UnitX(), PI);
     /* w ≈ 0, x ≈ 1 */
     EXPECT_NEAR(std::fabs(q.w()), 0.0f, TOL);
     EXPECT_NEAR(std::fabs(q.x()), 1.0f, TOL);
@@ -214,7 +215,7 @@ TEST(QuatRotateVector, IdentityLeavesVectorUnchanged)
 
 TEST(QuatRotateVector, OneEightyAboutX)
 {
-    Quat q = quat_from_axis_angle(Vec3::UnitX(), static_cast<float>(M_PI));
+    Quat q = quat_from_axis_angle(Vec3::UnitX(), PI);
     Vec3 result = quat_rotate_vector(q, Vec3::UnitY());
     EXPECT_VEC3_NEAR(result, Vec3(0.0f, -1.0f, 0.0f));
 }
@@ -387,9 +388,8 @@ TEST(QuatErrorAngle, NinetyDeg)
 TEST(QuatErrorAngle, OneEightyDeg)
 {
     Quat a = quat_identity();
-    Quat b = quat_from_axis_angle(Vec3::UnitZ(),
-                                   static_cast<float>(M_PI));
-    EXPECT_NEAR(quat_error_angle(a, b), static_cast<float>(M_PI), TOL_DEG);
+    Quat b = quat_from_axis_angle(Vec3::UnitZ(), PI);
+    EXPECT_NEAR(quat_error_angle(a, b), PI, TOL_DEG);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

@@ -5,8 +5,7 @@
  * Must call timestamp_init() once at boot before any reads.
  */
 
-#ifndef ACS4_TIMESTAMP_H
-#define ACS4_TIMESTAMP_H
+#pragma once
 
 #include <cstdint>
 
@@ -53,5 +52,3 @@ inline float cycles_to_us(uint32_t cycles)
 }
 
 }  // namespace acs
-
-#endif /* ACS4_TIMESTAMP_H */

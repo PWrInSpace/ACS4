@@ -5,6 +5,7 @@
 
 #include "navigation/quaternion.h"
 
+#include <algorithm>
 #include <cmath>
 
 namespace acs {
@@ -55,7 +56,7 @@ Quat quat_normalize(const Quat& q)
     if (n < 1e-10f || std::isnan(n)) {
         return Quat::Identity();
     }
-    return Quat(q.w() / n, q.x() / n, q.y() / n, q.z() / n);
+    return Quat(q.coeffs() / n);
 }
 
 /* ── Euler extraction ────────────────────────────────────────────────────── */
@@ -72,7 +73,7 @@ void quat_to_euler(const Quat& q, float& roll, float& pitch, float& yaw)
 
     const float sinp = -R(2, 0);
     /* Clamp for numerical safety near ±90° pitch (gimbal lock region). */
-    const float sinp_clamped = std::fmin(1.0f, std::fmax(-1.0f, sinp));
+    const float sinp_clamped = std::clamp(sinp, -1.0f, 1.0f);
 
     roll  = std::atan2(R(2, 1), R(2, 2));
     pitch = std::asin(sinp_clamped);
@@ -94,9 +95,9 @@ float quat_error_angle(const Quat& a, const Quat& b)
 {
     /* θ = 2 · acos(|a · b|)
      * Dot product of quaternion coefficients. */
-    float dot = std::fabs(a.w() * b.w() + a.x() * b.x() +
-                          a.y() * b.y() + a.z() * b.z());
-    dot = std::fmin(1.0f, dot);   /* clamp for numerical safety */
+    float dot = std::abs(a.w() * b.w() + a.x() * b.x() +
+                         a.y() * b.y() + a.z() * b.z());
+    dot = std::min(1.0f, dot);   /* clamp for numerical safety */
     return 2.0f * std::acos(dot);
 }
 

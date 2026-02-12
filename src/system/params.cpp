@@ -7,6 +7,8 @@
 #include <cstring>
 
 extern "C" {
+#include "ch.h"
+
 #include <chprintf.h>
 }
 
@@ -85,7 +87,9 @@ bool param_set(const char *name, float value)
     {
         return false;
     }
+    chSysLock();
     p->value = value;
+    chSysUnlock();
     return true;
 }
 

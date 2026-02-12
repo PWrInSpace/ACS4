@@ -6,8 +6,7 @@
  * Hardware watchdog: IWDG with ~500ms timeout as last resort.
  */
 
-#ifndef ACS4_WATCHDOG_H
-#define ACS4_WATCHDOG_H
+#pragma once
 
 #include <cstdint>
 
@@ -40,5 +39,3 @@ int watchdog_register(const char *name, uint32_t timeout_ms);
 void watchdog_feed(int slot_id);
 
 }  // namespace acs
-
-#endif /* ACS4_WATCHDOG_H */

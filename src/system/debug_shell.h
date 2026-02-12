@@ -5,8 +5,7 @@
  * Provides commands: version, uptime, threads, reboot, perf, errors, param.
  */
 
-#ifndef ACS4_DEBUG_SHELL_H
-#define ACS4_DEBUG_SHELL_H
+#pragma once
 
 #include <cstdint>
 
@@ -28,5 +27,3 @@ namespace acs
 void shell_start(SerialDriver *serial_driver, uint32_t baudrate = 921600);
 
 }  // namespace acs
-
-#endif /* ACS4_DEBUG_SHELL_H */

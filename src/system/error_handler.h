@@ -5,8 +5,7 @@
  * Integrates with shell via `errors` command.
  */
 
-#ifndef ACS4_ERROR_HANDLER_H
-#define ACS4_ERROR_HANDLER_H
+#pragma once
 
 #include <cstdint>
 
@@ -37,7 +36,7 @@ enum class ErrorCode : uint16_t
     BATTERY_LOW,
     WATCHDOG_TIMEOUT,
 
-    _COUNT /* must be last */
+    COUNT /* must be last */
 };
 
 /**
@@ -71,5 +70,3 @@ void error_clear_all();
 void error_print(BaseSequentialStream *chp);
 
 }  // namespace acs
-
-#endif /* ACS4_ERROR_HANDLER_H */

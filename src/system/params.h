@@ -5,8 +5,7 @@
  * Changeable via shell without recompilation.
  */
 
-#ifndef ACS4_PARAMS_H
-#define ACS4_PARAMS_H
+#pragma once
 
 #include <cstdint>
 
@@ -59,5 +58,3 @@ void param_list(BaseSequentialStream *chp);
 ParamEntry *param_table(int &count);
 
 }  // namespace acs
-
-#endif /* ACS4_PARAMS_H */

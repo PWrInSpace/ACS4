@@ -291,7 +291,9 @@ set_source_files_properties(
 )
 
 # ── C++ flags (application code) ─────────────────────────────────────────
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-exceptions -fno-rtti -fno-threadsafe-statics")
+target_compile_options(${PROJECT_NAME} PRIVATE
+    $<$<COMPILE_LANGUAGE:CXX>:-fno-exceptions -fno-rtti -fno-threadsafe-statics>
+)
 
 # ── ASM flags (suppress C warnings for .S files) ─────────────────────────
 set_source_files_properties(

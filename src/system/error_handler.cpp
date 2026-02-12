@@ -23,7 +23,7 @@ struct ErrorEntry
     uint32_t last_ms; /* systime of last occurrence */
 };
 
-static ErrorEntry s_errors[static_cast<int>(ErrorCode::_COUNT)] = {};
+static ErrorEntry s_errors[static_cast<int>(ErrorCode::COUNT)] = {};
 
 /* ── Name lookup ──────────────────────────────────────────────────────── */
 
@@ -47,7 +47,7 @@ static const char *const s_error_names[] = {
 // clang-format on
 
 static_assert(sizeof(s_error_names) / sizeof(s_error_names[0])
-                  == static_cast<int>(ErrorCode::_COUNT),
+                  == static_cast<int>(ErrorCode::COUNT),
               "s_error_names out of sync with ErrorCode enum");
 
 /* ── Critical error set ───────────────────────────────────────────────── */
@@ -72,7 +72,7 @@ bool is_critical(ErrorCode code)
 void error_report(ErrorCode code)
 {
     auto idx = static_cast<int>(code);
-    if (idx <= 0 || idx >= static_cast<int>(ErrorCode::_COUNT))
+    if (idx <= 0 || idx >= static_cast<int>(ErrorCode::COUNT))
     {
         return;
     }
@@ -87,7 +87,7 @@ void error_report(ErrorCode code)
 uint32_t error_count(ErrorCode code)
 {
     auto idx = static_cast<int>(code);
-    if (idx <= 0 || idx >= static_cast<int>(ErrorCode::_COUNT))
+    if (idx <= 0 || idx >= static_cast<int>(ErrorCode::COUNT))
     {
         return 0;
     }
@@ -124,7 +124,7 @@ void error_print(BaseSequentialStream *chp)
     chprintf(chp, "------------------------------------------------------\r\n");
 
     bool any = false;
-    for (int i = 1; i < static_cast<int>(ErrorCode::_COUNT); i++)
+    for (int i = 1; i < static_cast<int>(ErrorCode::COUNT); i++)
     {
         auto code = static_cast<ErrorCode>(i);
         if (s_errors[i].count > 0)

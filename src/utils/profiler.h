@@ -6,8 +6,7 @@
  * Use PROFILE_BEGIN / PROFILE_END macros in hot loops.
  */
 
-#ifndef ACS4_PROFILER_H
-#define ACS4_PROFILER_H
+#pragma once
 
 #include <cstdint>
 #include <cstring>
@@ -60,16 +59,18 @@ inline int &profiler_slot_count()
  */
 inline int profiler_register(const char *name)
 {
-    int id = profiler_slot_count()++;
-    if (id < PROFILER_MAX_SLOTS)
+    int &n = profiler_slot_count();
+    if (n >= PROFILER_MAX_SLOTS)
     {
-        auto &s        = profiler_slot(id);
-        s.name         = name;
-        s.last_cycles  = 0;
-        s.max_cycles   = 0;
-        s.total_cycles = 0;
-        s.count        = 0;
+        return -1;
     }
+    int id = n++;
+    auto &s        = profiler_slot(id);
+    s.name         = name;
+    s.last_cycles  = 0;
+    s.max_cycles   = 0;
+    s.total_cycles = 0;
+    s.count        = 0;
     return id;
 }
 
@@ -161,5 +162,3 @@ inline void profiler_reset()
 
 #define PROFILE_BEGIN(slot_id) acs::profiler_begin(slot_id)
 #define PROFILE_END(slot_id)   acs::profiler_end(slot_id)
-
-#endif /* ACS4_PROFILER_H */
