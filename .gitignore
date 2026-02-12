@@ -2,6 +2,7 @@
 
 # Build output
 build/
+build_test/
 cmake-build-*/
 compile_commands.json
 

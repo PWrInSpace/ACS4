@@ -230,6 +230,9 @@ set(CHIBIOS_INCLUDE_DIRS
     # OS library
     ${CHIBIOS}/os/oslib/include
 
+    # Eigen (header-only math library)
+    ${CMAKE_CURRENT_SOURCE_DIR}/lib/eigen
+
     # Application
     ${CMAKE_CURRENT_SOURCE_DIR}/src
 )

@@ -39,6 +39,8 @@ clean:
 # ── Rebuild from scratch ─────────────────────────────────────────────────
 rebuild: clean build
 
-# ── Unit tests (native x86, future) ──────────────────────────────────────
+# ── Unit tests (native x86, Google Test) ─────────────────────────────────
 test:
-	@echo "TODO: native x86 test build not yet configured"
+	@cmake -B build_test -S tests -G Ninja
+	@cmake --build build_test
+	@cd build_test && ctest --output-on-failure
