@@ -64,7 +64,7 @@ inline int profiler_register(const char *name)
     {
         return -1;
     }
-    int   id       = n++;
+    const int id   = n++;
     auto &s        = profiler_slot(id);
     s.name         = name;
     s.last_cycles  = 0;
@@ -87,9 +87,9 @@ inline void profiler_begin(int slot_id)
  */
 inline void profiler_end(int slot_id)
 {
-    uint32_t now   = DWT->CYCCNT;
-    auto    &s     = profiler_slot(slot_id);
-    uint32_t delta = now - s._start; /* handles wrap correctly */
+    const uint32_t now   = DWT->CYCCNT;
+    auto            &s    = profiler_slot(slot_id);
+    const uint32_t   delta = now - s._start; /* handles wrap correctly */
 
     s.last_cycles = delta;
     s.total_cycles += delta;
@@ -105,7 +105,7 @@ inline void profiler_end(int slot_id)
  */
 inline void profiler_print(BaseSequentialStream *chp)
 {
-    int n = profiler_slot_count();
+    const int n = profiler_slot_count();
     if (n == 0)
     {
         chprintf(chp, "No profiling slots registered.\r\n");
@@ -126,7 +126,7 @@ inline void profiler_print(BaseSequentialStream *chp)
     for (int i = 0; i < n && i < PROFILER_MAX_SLOTS; i++)
     {
         auto &s = profiler_slot(i);
-        float avg_us =
+        const float avg_us =
             (s.count > 0)
                 ? cycles_to_us(static_cast<uint32_t>(s.total_cycles / s.count))
                 : 0.0f;
@@ -145,7 +145,7 @@ inline void profiler_print(BaseSequentialStream *chp)
  */
 inline void profiler_reset()
 {
-    int n = profiler_slot_count();
+    const int n = profiler_slot_count();
     for (int i = 0; i < n && i < PROFILER_MAX_SLOTS; i++)
     {
         auto &s        = profiler_slot(i);

@@ -52,6 +52,7 @@ The firmware is built upon an embedded framework designed for high-performance c
 | `cmake` | ≥ 3.20 | `sudo apt install cmake` |
 | `ninja-build` | any | `sudo apt install ninja-build` |
 | `openocd` | any | `sudo apt install openocd` |
+| `clang-tidy` | ≥ 18 | `sudo apt install clang-tidy-18` |
 
 **For unit tests only:** a host C++17 compiler (`g++` or `clang++`). Google Test is fetched automatically by CMake.
 
@@ -146,6 +147,39 @@ screen /dev/ttyACM0 921600
 | `perf` | Execution time statistics |
 | `errors` | System error counters |
 | `reboot` | Software reset |
+
+---
+
+## Static Analysis (clang-tidy)
+
+The project uses **clang-tidy 18** for static analysis. Configuration lives in `.clang-tidy` and is tuned for embedded C++17 with ChibiOS + Eigen (suppresses false positives from RTOS macros and cross-compilation).
+
+### Targets
+
+| Command | Scope | Requires ARM toolchain? |
+|---|---|---|
+| `make lint` | Platform-independent `src/` code compiled in the test build | No |
+| `make lint-all` | All `src/*.cpp` (full firmware, ARM compile DB) | Yes |
+| `make lint-fix` | Same as `lint`, with `--fix` auto-applied | No |
+
+### Usage
+
+```bash
+# Quick check — only modules included in the x86 test build
+make lint
+
+# Full check — all application code against the ARM build
+make lint-all
+
+# Auto-fix what clang-tidy can fix automatically
+make lint-fix
+```
+
+Results are saved to `build_test/clang-tidy.log` (lint/lint-fix) or `build/clang-tidy.log` (lint-all).
+
+> **Note:** `make lint` / `make lint-fix` automatically discover which `src/` files the test CMake compiles — no hardcoded paths. When you add a new module to `tests/CMakeLists.txt`, it gets linted automatically.
+
+> **Note:** `make lint-all` injects ARM GCC system include paths so that host clang-tidy can parse ChibiOS headers. This requires `arm-none-eabi-g++` on `$PATH`.
 
 ---
 

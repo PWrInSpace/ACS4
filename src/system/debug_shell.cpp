@@ -50,10 +50,10 @@ static void cmd_uptime(BaseSequentialStream *chp, int argc, char *argv[])
 {
     (void)argc;
     (void)argv;
-    uint32_t ms = static_cast<uint32_t>(chTimeI2MS(chVTGetSystemTimeX()));
-    uint32_t s  = ms / 1000;
-    uint32_t m  = s / 60;
-    uint32_t h  = m / 60;
+    const auto ms = static_cast<uint32_t>(chTimeI2MS(chVTGetSystemTimeX()));
+    const uint32_t s = ms / 1000;
+    const uint32_t m = s / 60;
+    const uint32_t h = m / 60;
     chprintf(chp,
              "Uptime: %lu:%02lu:%02lu (%lu ms)\r\n",
              h,
@@ -98,8 +98,8 @@ static void cmd_threads(BaseSequentialStream *chp, int argc, char *argv[])
     {
         uint32_t stk_free = 0;
 #if CH_DBG_FILL_THREADS == TRUE
-        uint8_t *begin = reinterpret_cast<uint8_t *>(tp->wabase);
-        uint8_t *end   = reinterpret_cast<uint8_t *>(tp + 1);
+        auto *begin = reinterpret_cast<uint8_t *>(tp->wabase);
+        auto *end   = reinterpret_cast<uint8_t *>(tp + 1);
         while (begin < end && *begin == CH_DBG_STACK_FILL_VALUE)
         {
             begin++;
@@ -108,8 +108,8 @@ static void cmd_threads(BaseSequentialStream *chp, int argc, char *argv[])
             begin - reinterpret_cast<uint8_t *>(tp->wabase));
 #endif
 
-        const char *name = tp->name ? tp->name : "<unnamed>";
-        unsigned    idx  = static_cast<unsigned>(tp->state);
+        const char *name = (tp->name != nullptr) ? tp->name : "<unnamed>";
+        const auto  idx  = static_cast<unsigned>(tp->state);
         const char *st   = (idx < sizeof(state_names) / sizeof(state_names[0]))
                                ? state_names[idx]
                                : "???";
@@ -177,7 +177,7 @@ static void cmd_param(BaseSequentialStream *chp, int argc, char *argv[])
     }
     else if (strcmp(argv[0], "set") == 0 && argc >= 3)
     {
-        float val = static_cast<float>(strtod(argv[2], nullptr));
+        auto val = static_cast<float>(strtod(argv[2], nullptr));
         if (acs::param_set(argv[1], val))
         {
             chprintf(chp, "%s = %.6f\r\n", argv[1], static_cast<double>(val));

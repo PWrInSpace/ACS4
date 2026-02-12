@@ -53,11 +53,11 @@ static constexpr int PARAM_COUNT =
 
 static ParamEntry *find_param(const char *name)
 {
-    for (int i = 0; i < PARAM_COUNT; i++)
+    for (auto &entry : s_params)
     {
-        if (strcmp(s_params[i].name, name) == 0)
+        if (strcmp(entry.name, name) == 0)
         {
-            return &s_params[i];
+            return &entry;
         }
     }
     return nullptr;
@@ -95,9 +95,9 @@ bool param_set(const char *name, float value)
 
 void param_reset_all()
 {
-    for (int i = 0; i < PARAM_COUNT; i++)
+    for (auto &entry : s_params)
     {
-        s_params[i].value = s_params[i].default_val;
+        entry.value = entry.default_val;
     }
 }
 
@@ -114,9 +114,8 @@ void param_list(BaseSequentialStream *chp)
              "-----------------------------------------------------------------"
              "---------\r\n");
 
-    for (int i = 0; i < PARAM_COUNT; i++)
+    for (const auto &p : s_params)
     {
-        const auto &p = s_params[i];
         chprintf(chp,
                  "%-28s %12.4f %12.4f [%8.3f, %8.3f]\r\n",
                  p.name,

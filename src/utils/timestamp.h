@@ -35,11 +35,16 @@ inline uint32_t timestamp_cycles()
 }
 
 /**
+ * @brief Cycles-per-microsecond constant (computed at compile time).
+ */
+inline constexpr uint32_t CYCLES_PER_US = STM32_SYS_CK / 1000000UL;
+
+/**
  * @brief Read time in microseconds since boot (wraps every ~7.8s).
  */
 inline uint32_t timestamp_us()
 {
-    return DWT->CYCCNT / (STM32_SYS_CK / 1000000UL);
+    return DWT->CYCCNT / CYCLES_PER_US;
 }
 
 /**
@@ -47,8 +52,7 @@ inline uint32_t timestamp_us()
  */
 inline float cycles_to_us(uint32_t cycles)
 {
-    return static_cast<float>(cycles)
-           / static_cast<float>(STM32_SYS_CK / 1000000UL);
+    return static_cast<float>(cycles) / static_cast<float>(CYCLES_PER_US);
 }
 
 }  // namespace acs

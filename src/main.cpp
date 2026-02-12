@@ -58,7 +58,7 @@ static THD_FUNCTION(Blinker, arg)
 /* Application entry point                                                   */
 /*---------------------------------------------------------------------------*/
 
-int main(void)
+int main()
 {
     /* HAL initialization, this also initializes the configured device
      * drivers and performs the board-specific initializations. */

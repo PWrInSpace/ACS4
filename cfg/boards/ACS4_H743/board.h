@@ -23,7 +23,7 @@
 #define BOARD_H
 
 /*===========================================================================*/
-/* Driver constants.                                                         */
+/* Driver constants.  TEN PLIK TO PLACEHOLDER!!! Trzeba ustawic pinout jak chlopaki zrobia plytke                                                    */
 /*===========================================================================*/
 
 /*

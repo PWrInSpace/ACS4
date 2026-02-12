@@ -37,7 +37,7 @@ int watchdog_register(const char *name, uint32_t timeout_ms)
     {
         return -1;
     }
-    int id                 = s_slot_count++;
+    const int id           = s_slot_count++;
     s_slots[id].name       = name;
     s_slots[id].timeout_ms = timeout_ms;
     s_slots[id].last_feed_ms =
@@ -69,7 +69,7 @@ static THD_FUNCTION(WdgMonitor, arg)
 
     while (true)
     {
-        uint32_t now_ms =
+        const auto now_ms =
             static_cast<uint32_t>(chTimeI2MS(chVTGetSystemTimeX()));
 
         /* Check each software watchdog slot. */
@@ -80,7 +80,7 @@ static THD_FUNCTION(WdgMonitor, arg)
                 continue;
             }
 
-            uint32_t elapsed = now_ms - s_slots[i].last_feed_ms;
+            const uint32_t elapsed = now_ms - s_slots[i].last_feed_ms;
             if (elapsed > s_slots[i].timeout_ms && !s_slots[i].timed_out)
             {
                 s_slots[i].timed_out = true;
