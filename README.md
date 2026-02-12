@@ -1,43 +1,88 @@
-# ACS4 - Attitude Control System
+# ACS4 — Attitude Control System
 
-Flight computer firmware for a PWrInSpace rocket active stabilization system using canard fins.
-**Production Target:** Custom PCB (STM32H743)
-**Development Target:** NUCLEO-H723ZG
+Flight computer firmware for a **PWrInSpace** rocket active stabilization system using **4 canard fins**.
+
+| | Target |
+|---|---|
+| **Production** | Custom PCB — STM32H743VIT6 |
+| **Development** | NUCLEO-144 — STM32H723ZGT6 |
+
+---
+
+## Hardware Overview
+
+ACS4 controls the rocket's roll, pitch, and yaw via 4 independently actuated canard fins mounted near the nosecone.
+
+> *Sensor suite, servo interfaces, and detailed pinout — TBD.*
 
 ---
 
 ## Software Architecture
 
-The firmware is built upon a embedded framework designed for high-performance control loops.
+The firmware is built upon an embedded framework designed for high-performance control loops.
 
 *   **RTOS:** ChibiOS/RT 21.11
-*   **Language:** C++17 Embedded
+*   **Language:** C++17 (no exceptions, no RTTI)
 *   **Build System:** CMake + Ninja (managed via Makefile wrapper)
-*   **Key Features:**
-    *   **Interactive Shell:** CLI available on UART3 (921600 baud) for runtime debugging.
-    *   **Runtime Parameters:** Modify control gains (PID) and settings in-flight via `param set`.
-    *   **Profiler:** Cycle-accurate execution timing (`perf` command) based on DWT hardware.
-    *   **Error Handling:** Centralized fault reporting (`errors` command) with Watchdog protection.
+*   **Math:** Eigen 3 (header-only, single-precision float)
+
+**Key modules:**
+
+| Directory | Description |
+|---|---|
+| `src/navigation/` | Quaternion algebra (Hamilton, ZYX Euler, body→NED) — Eigen-backed |
+| `src/system/` | Shell, error handler, runtime params, watchdog |
+| `src/utils/` | DWT timestamp, cycle-accurate profiler |
+| `cfg/` | Per-board ChibiOS config (`chconf.h`, `halconf.h`, `mcuconf.h`) |
+| `tests/` | Unit tests (Google Test, native x86 build) |
+
+**Runtime features:**
+*   **Interactive Shell** — CLI on UART3 (921600 baud) for debugging.
+*   **Runtime Parameters** — Modify PID gains in-flight via `param set`.
+*   **Profiler** — Cycle-accurate execution timing (`perf` command).
+*   **Error Handling** — Centralized fault counters with watchdog protection.
+
+---
+
+## Prerequisites
+
+| Tool | Minimum version | Install (Ubuntu/Debian) |
+|---|---|---|
+| `arm-none-eabi-gcc` | ≥ 12 | `sudo apt install gcc-arm-none-eabi` |
+| `cmake` | ≥ 3.20 | `sudo apt install cmake` |
+| `ninja-build` | any | `sudo apt install ninja-build` |
+| `openocd` | any | `sudo apt install openocd` |
+
+**For unit tests only:** a host C++17 compiler (`g++` or `clang++`). Google Test is fetched automatically by CMake.
+
+---
+
+## Getting Started
+
+```bash
+# 1. Clone with submodules (ChibiOS + Eigen)
+git clone --recurse-submodules https://github.com/PWrInSpace/ACS4.git
+cd ACS4
+
+# If already cloned without submodules:
+git submodule update --init --recursive
+```
 
 ---
 
 ## Build & Flash
 
-Prerequisites: `arm-none-eabi-gcc`, `cmake`, `ninja-build`, `openocd`.
-
-### 1. Build
-
-Use the provided `make` wrapper for convenience:
+### Build
 
 ```bash
-# Default: Build for NUCLEO-H723ZG
+# Default: NUCLEO-H723ZG (dev board)
 make build
 
-# Build for Custom PCB (STM32H743)
+# Production PCB (STM32H743)
 make build TARGET=CUSTOM_H743
 ```
 
-### 2. Flash
+### Flash
 
 Connect the board via ST-Link (USB):
 
@@ -45,19 +90,59 @@ Connect the board via ST-Link (USB):
 make flash
 ```
 
-### 3. Debug / Terminal
-
-To access the system shell:
+### Debug (GDB + OpenOCD)
 
 ```bash
-# Connect to Serial Console (Exit with: Ctrl+A, then K, then Y)
+make debug
+```
+
+This starts OpenOCD in the background, launches `arm-none-eabi-gdb`, connects to the target, and loads the ELF.
+
+### Clean / Rebuild
+
+```bash
+make clean          # Remove build directory
+make rebuild        # Clean + build from scratch
+```
+
+---
+
+## Unit Tests
+
+Platform-independent code (quaternion library, etc.) is tested natively on x86 using Google Test:
+
+```bash
+make test
+```
+
+This configures a separate `build_test/` directory, compiles against the host compiler, and runs `ctest`:
+
+```
+100% tests passed, 0 tests failed out of 41
+```
+
+Test sources live in `tests/unit/`. Google Test v1.14.0 is fetched automatically at configure time.
+
+---
+
+## Serial Shell
+
+```bash
+# Connect to Serial Console (Exit: Ctrl+A → K → Y)
 screen /dev/ttyACM0 921600
 ```
 
-**Shell Commands:**
-*   `threads` - List active tasks and stack usage.
-*   `param list` - Show tunable parameters.
-*   `param set <name> <val>` - Change a parameter.
-*   `perf` - Show execution time stats.
-*   `errors` - Show system error counters.
-*   `reboot` - Reset the board.
+**Commands:**
+
+| Command | Description |
+|---|---|
+| `version` | Firmware version, build date, git hash |
+| `uptime` | Time since boot |
+| `threads` | Active tasks and stack usage |
+| `param list` | Show all tunable parameters |
+| `param set <name> <val>` | Change a parameter at runtime |
+| `param get <name>` | Read a parameter value |
+| `param defaults` | Reset all parameters to defaults |
+| `perf` | Execution time statistics |
+| `errors` | System error counters |
+| `reboot` | Software reset |
