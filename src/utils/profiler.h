@@ -64,7 +64,7 @@ inline int profiler_register(const char *name)
     {
         return -1;
     }
-    int id = n++;
+    int   id       = n++;
     auto &s        = profiler_slot(id);
     s.name         = name;
     s.last_cycles  = 0;

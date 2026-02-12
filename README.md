@@ -146,3 +146,24 @@ screen /dev/ttyACM0 921600
 | `perf` | Execution time statistics |
 | `errors` | System error counters |
 | `reboot` | Software reset |
+
+---
+
+## Code Formatting (clang-format)
+
+The project uses **clang-format**.
+
+### Usage
+
+```bash
+# Format a single file
+clang-format -i src/navigation/quaternion.cpp
+
+# Format all project sources
+find src tests -name '*.cpp' -o -name '*.h' -o -name '*.c' | xargs clang-format -i
+
+# Check formatting without modifying (CI-friendly)
+find src tests -name '*.cpp' -o -name '*.h' -o -name '*.c' | xargs clang-format --dry-run --Werror
+```
+
+> **Note:** Do NOT run clang-format on `cfg/` or `lib/` — those are external (ChibiOS config / Eigen).

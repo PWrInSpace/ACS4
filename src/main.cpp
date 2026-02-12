@@ -89,7 +89,11 @@ int main(void)
     chprintf(serial, "\r\n");
 
     /* Create worker threads. */
-    chThdCreateStatic(waBlinker, sizeof(waBlinker), NORMALPRIO, Blinker, nullptr);
+    chThdCreateStatic(waBlinker,
+                      sizeof(waBlinker),
+                      NORMALPRIO,
+                      Blinker,
+                      nullptr);
 
     /* main() becomes the idle thread. */
     while (true)

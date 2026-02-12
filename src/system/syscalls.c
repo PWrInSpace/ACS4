@@ -7,8 +7,8 @@
  * handles all I/O through its own HAL drivers.
  */
 
-#include <sys/stat.h>
 #include <errno.h>
+#include <sys/stat.h>
 
 int _close(int fd)
 {
