@@ -1,5 +1,5 @@
 /*
- * ACS4 Flight Computer — ChibiOS Shell Configuration (Custom H743)
+ * ACS4 Flight Computer — ChibiOS Shell Configuration (Custom H725)
  */
 
 #ifndef SHELLCONF_H

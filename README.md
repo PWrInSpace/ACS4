@@ -4,7 +4,7 @@ Flight computer firmware for a **PWrInSpace** rocket active stabilization system
 
 | | Target |
 |---|---|
-| **Production** | Custom PCB — STM32H743VIT6 |
+| **Production** | Custom PCB — STM32H725VGT6 |
 | **Development** | NUCLEO-144 — STM32H723ZGT6 |
 
 ---
@@ -37,7 +37,7 @@ The firmware is built upon an embedded framework designed for high-performance c
 | `tests/` | Unit tests (Google Test, native x86 build) |
 
 **Runtime features:**
-*   **Interactive Shell** — CLI on UART3 (921600 baud) for debugging.
+*   **Interactive Shell** — CLI on USB CDC (custom PCB) or UART3 (Nucleo) for debugging.
 *   **Runtime Parameters** — Modify PID gains in-flight via `param set`.
 *   **Profiler** — Cycle-accurate execution timing (`perf` command).
 *   **Error Handling** — Centralized fault counters with watchdog protection.
@@ -79,8 +79,8 @@ git submodule update --init --recursive
 # Default: NUCLEO-H723ZG (dev board)
 make build
 
-# Production PCB (STM32H743)
-make build TARGET=CUSTOM_H743
+# Production PCB (STM32H725)
+make build TARGET=CUSTOM_H725
 ```
 
 ### Flash

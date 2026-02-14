@@ -1,6 +1,6 @@
 /*
     ACS4 Flight Computer - ChibiOS/RT Kernel Configuration
-    Target: STM32H723ZG (NUCLEO-H723ZG dev board)
+    Target: STM32H725VGT6 (ACS4 custom PCB)
 
     ChibiOS/RT (full RTOS) with:
     - 10 kHz system tick (100 μs resolution)

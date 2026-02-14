@@ -1,6 +1,6 @@
 # =============================================================================
 # ACS4 Flight Computer — CMake Build System
-# Target: STM32H723ZG (dev) / STM32H743VIT6 (prod)
+# Target: STM32H723ZG (dev) / STM32H725VGT6 (prod)
 # RTOS:   ChibiOS/RT
 # =============================================================================
 cmake_minimum_required(VERSION 3.20)
@@ -20,9 +20,9 @@ set(CHIBIOS ${CMAKE_CURRENT_SOURCE_DIR}/lib/chibios)
 
 # ── Target board selection ────────────────────────────────────────────────
 # NUCLEO_H723 = NUCLEO-144 dev board (STM32H723ZGT6)
-# CUSTOM_H743 = Production PCB       (STM32H743VIT6)
-set(ACS4_TARGET "NUCLEO_H723" CACHE STRING "Target board: NUCLEO_H723 | CUSTOM_H743")
-set_property(CACHE ACS4_TARGET PROPERTY STRINGS NUCLEO_H723 CUSTOM_H743)
+# CUSTOM_H725 = Production PCB       (STM32H725VGT6)
+set(ACS4_TARGET "NUCLEO_H723" CACHE STRING "Target board: NUCLEO_H723 | CUSTOM_H725")
+set_property(CACHE ACS4_TARGET PROPERTY STRINGS NUCLEO_H723 CUSTOM_H725)
 
 if(ACS4_TARGET STREQUAL "NUCLEO_H723")
     message(STATUS "Target: NUCLEO-144 H723ZG (dev)")
@@ -31,15 +31,15 @@ if(ACS4_TARGET STREQUAL "NUCLEO_H723")
     set(BOARD_DIR  ${CHIBIOS}/os/hal/boards/ST_NUCLEO144_H723ZG)
     set(CONFDIR    ${CMAKE_CURRENT_SOURCE_DIR}/cfg/nucleo_h723)
     set(MCU_DEFINE STM32H723xx)
-elseif(ACS4_TARGET STREQUAL "CUSTOM_H743")
-    message(STATUS "Target: ACS4 custom PCB H743VI (prod)")
+elseif(ACS4_TARGET STREQUAL "CUSTOM_H725")
+    message(STATUS "Target: ACS4 custom PCB H725VG (prod)")
     set(LINKER_SCRIPT
-        ${CHIBIOS}/os/common/startup/ARMCMx/compilers/GCC/ld/STM32H743xI.ld)
-    set(BOARD_DIR  ${CMAKE_CURRENT_SOURCE_DIR}/cfg/boards/ACS4_H743)
-    set(CONFDIR    ${CMAKE_CURRENT_SOURCE_DIR}/cfg/custom_h743)
-    set(MCU_DEFINE STM32H743xx)
+        ${CHIBIOS}/os/common/startup/ARMCMx/compilers/GCC/ld/STM32H723xG_ITCM64k.ld)
+    set(BOARD_DIR  ${CMAKE_CURRENT_SOURCE_DIR}/cfg/boards/ACS4_H725)
+    set(CONFDIR    ${CMAKE_CURRENT_SOURCE_DIR}/cfg/custom_h725)
+    set(MCU_DEFINE STM32H725xx)
 else()
-    message(FATAL_ERROR "Unknown ACS4_TARGET '${ACS4_TARGET}'. Use NUCLEO_H723 or CUSTOM_H743.")
+    message(FATAL_ERROR "Unknown ACS4_TARGET '${ACS4_TARGET}'. Use NUCLEO_H723 or CUSTOM_H725.")
 endif()
 
 # =============================================================================
@@ -81,6 +81,9 @@ set(CHIBIOS_HAL_C
     ${CHIBIOS}/os/hal/src/hal_mmcsd.c
     ${CHIBIOS}/os/hal/src/hal_pal.c
     ${CHIBIOS}/os/hal/src/hal_serial.c
+    ${CHIBIOS}/os/hal/src/hal_spi.c
+    ${CHIBIOS}/os/hal/src/hal_usb.c
+    ${CHIBIOS}/os/hal/src/hal_serial_usb.c
     ${CHIBIOS}/os/hal/src/hal_flash.c
     ${CHIBIOS}/os/hal/src/hal_st.c
 )
@@ -97,6 +100,8 @@ set(CHIBIOS_HAL_PLATFORM_C
     ${CHIBIOS}/os/hal/ports/STM32/LLD/MDMAv1/stm32_mdma.c
     ${CHIBIOS}/os/hal/ports/STM32/LLD/SYSTICKv1/hal_st_lld.c
     ${CHIBIOS}/os/hal/ports/STM32/LLD/USARTv3/hal_serial_lld.c
+    ${CHIBIOS}/os/hal/ports/STM32/LLD/SPIv3/hal_spi_v2_lld.c
+    ${CHIBIOS}/os/hal/ports/STM32/LLD/OTGv1/hal_usb_lld.c
 )
 
 # ── HAL board (selected by ACS4_TARGET) ──────────────────────────────────
@@ -264,6 +269,7 @@ add_executable(${PROJECT_NAME}
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${CHIBIOS_INCLUDE_DIRS})
 target_compile_definitions(${PROJECT_NAME} PRIVATE
+    ${MCU_DEFINE}
     CORTEX_USE_FPU=TRUE
     SHELL_CONFIG_FILE=TRUE
 )

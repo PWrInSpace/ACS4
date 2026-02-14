@@ -5,15 +5,16 @@
  *   1. HAL + RTOS init
  *   2. DWT timestamp init
  *   3. Watchdog init (software + IWDG)
- *   4. Debug shell on UART3 (921600 baud)
+ *   4. Debug shell (USB CDC on custom PCB, UART3 on Nucleo)
  *   5. Worker threads (blinker)
  *
- * Board LEDs (active HIGH, NUCLEO-H723ZG):
- *   LED1 (green)  — PB0
- *   LED3 (red)    — PB14
+ * NUCLEO-H723ZG (dev):
+ *   LED1 (green) — PB0,  LED3 (red) — PB14
+ *   USART3 (ST-Link VCP): TX=PD8, RX=PD9
  *
- * USART3 (ST-Link VCP):
- *   TX — PD8, RX — PD9
+ * ACS4 custom PCB (prod):
+ *   LED_1..LED_4 — PA1..PA3, PA7
+ *   USB CDC on PA11/PA12 (OTG_HS in FS mode)
  */
 
 extern "C" {
@@ -42,6 +43,15 @@ static THD_FUNCTION(Blinker, arg)
 
     while (true)
     {
+#if defined(STM32H725xx)
+        palSetLine(LINE_LED_1);
+        chThdSleepMilliseconds(100);
+        palClearLine(LINE_LED_1);
+
+        palSetLine(LINE_LED_3);
+        chThdSleepMilliseconds(100);
+        palClearLine(LINE_LED_3);
+#else
         palSetLine(LINE_LED1);
         chThdSleepMilliseconds(100);
         palClearLine(LINE_LED1);
@@ -49,7 +59,7 @@ static THD_FUNCTION(Blinker, arg)
         palSetLine(LINE_LED3);
         chThdSleepMilliseconds(100);
         palClearLine(LINE_LED3);
-
+#endif
         chThdSleepMilliseconds(800);
     }
 }
@@ -74,12 +84,18 @@ int main()
     /* Start software + hardware watchdog. */
     acs::watchdog_init();
 
-    /* Start debug shell on UART3 (ST-Link VCP) at 921600 baud.
-     * This also calls sdStart(&SD3, ...) internally. */
+    /* Start debug shell.
+     * Custom PCB: USB CDC (TODO: implement USB CDC init).
+     * Nucleo:     USART3 at 921600 baud via ST-Link VCP. */
+#if defined(STM32H725xx)
+    /* TODO: Initialize USB CDC and start shell on SerialUSBDriver SDU1.
+     * For now, start shell on UART4 (GPS port) for initial bring-up. */
+    acs::shell_start(&SD4, 921600);
+    auto *serial = reinterpret_cast<BaseSequentialStream *>(&SD4);
+#else
     acs::shell_start(&SD3, 921600);
-
-    /* Welcome banner on shell serial port. */
     auto *serial = reinterpret_cast<BaseSequentialStream *>(&SD3);
+#endif
     chprintf(serial, "\r\n");
     chprintf(serial, "========================================\r\n");
     chprintf(serial, "  ACS4 Flight Computer\r\n");
