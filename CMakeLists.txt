@@ -82,6 +82,11 @@ set(CHIBIOS_HAL_C
     ${CHIBIOS}/os/hal/src/hal_pal.c
     ${CHIBIOS}/os/hal/src/hal_serial.c
     ${CHIBIOS}/os/hal/src/hal_spi.c
+    ${CHIBIOS}/os/hal/src/hal_i2c.c
+    ${CHIBIOS}/os/hal/src/hal_adc.c
+    ${CHIBIOS}/os/hal/src/hal_can.c
+    ${CHIBIOS}/os/hal/src/hal_pwm.c
+    ${CHIBIOS}/os/hal/src/hal_sdc.c
     ${CHIBIOS}/os/hal/src/hal_usb.c
     ${CHIBIOS}/os/hal/src/hal_serial_usb.c
     ${CHIBIOS}/os/hal/src/hal_flash.c
@@ -101,6 +106,11 @@ set(CHIBIOS_HAL_PLATFORM_C
     ${CHIBIOS}/os/hal/ports/STM32/LLD/SYSTICKv1/hal_st_lld.c
     ${CHIBIOS}/os/hal/ports/STM32/LLD/USARTv3/hal_serial_lld.c
     ${CHIBIOS}/os/hal/ports/STM32/LLD/SPIv3/hal_spi_v2_lld.c
+    ${CHIBIOS}/os/hal/ports/STM32/LLD/I2Cv3/hal_i2c_lld.c
+    ${CHIBIOS}/os/hal/ports/STM32/LLD/ADCv4/hal_adc_lld.c
+    ${CHIBIOS}/os/hal/ports/STM32/LLD/FDCANv2/hal_can_lld.c
+    ${CHIBIOS}/os/hal/ports/STM32/LLD/TIMv1/hal_pwm_lld.c
+    ${CHIBIOS}/os/hal/ports/STM32/LLD/SDMMCv2/hal_sdc_lld.c
     ${CHIBIOS}/os/hal/ports/STM32/LLD/OTGv1/hal_usb_lld.c
 )
 
@@ -171,6 +181,7 @@ set(APP_SOURCES
     src/system/error_handler.cpp
     src/system/params.cpp
     src/system/syscalls.c
+    src/system/usb_cdc.cpp
     src/system/watchdog.cpp
 )
 

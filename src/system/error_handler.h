@@ -47,17 +47,17 @@ void error_report(ErrorCode code);
 /**
  * @brief Get the count for a specific error code.
  */
-uint32_t error_count(ErrorCode code);
+[[nodiscard]] uint32_t error_count(ErrorCode code);
 
 /**
  * @brief Check if an error is considered flight-critical (abort-worthy).
  */
-bool is_critical(ErrorCode code);
+[[nodiscard]] bool is_critical(ErrorCode code);
 
 /**
  * @brief Get human-readable name for an error code.
  */
-const char *error_name(ErrorCode code);
+[[nodiscard]] const char *error_name(ErrorCode code);
 
 /**
  * @brief Clear all error counters.

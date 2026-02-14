@@ -35,7 +35,7 @@ struct ProfileSlot
     uint32_t    max_cycles;
     uint64_t    total_cycles;
     uint32_t    count;
-    uint32_t    _start; /* internal: captured at PROFILE_BEGIN */
+    uint32_t    start_cycle; /* internal: captured at PROFILE_BEGIN */
 };
 
 /**
@@ -79,7 +79,7 @@ inline int profiler_register(const char *name)
  */
 inline void profiler_begin(int slot_id)
 {
-    profiler_slot(slot_id)._start = DWT->CYCCNT;
+    profiler_slot(slot_id).start_cycle = DWT->CYCCNT;
 }
 
 /**
@@ -89,7 +89,7 @@ inline void profiler_end(int slot_id)
 {
     const uint32_t now   = DWT->CYCCNT;
     auto            &s    = profiler_slot(slot_id);
-    const uint32_t   delta = now - s._start; /* handles wrap correctly */
+    const uint32_t   delta = now - s.start_cycle; /* handles wrap correctly */
 
     s.last_cycles = delta;
     s.total_cycles += delta;

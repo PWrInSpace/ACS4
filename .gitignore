@@ -3,6 +3,7 @@
 
 # Build output
 build/
+build_nucleo/
 build_test/
 cmake-build-*/
 compile_commands.json

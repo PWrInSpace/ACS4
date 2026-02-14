@@ -28,7 +28,7 @@ static ErrorEntry s_errors[static_cast<int>(ErrorCode::COUNT)] = {};
 /* ── Name lookup ──────────────────────────────────────────────────────── */
 
 // clang-format off
-static const char *const s_error_names[] = {
+static constexpr const char *const s_error_names[] = {
     "NONE",
     "IMU_COMM_FAIL",
     "IMU_SELF_TEST_FAIL",

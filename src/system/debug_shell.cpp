@@ -1,7 +1,7 @@
 /*
  * ACS4 Flight Computer — Debug Shell Implementation
  *
- * ChibiOS Shell on UART3 (ST-Link VCP, 921600 baud).
+ * ChibiOS Shell on UART (Nucleo) or USB CDC (custom PCB).
  * Low-priority thread for interactive debugging.
  */
 
@@ -222,19 +222,14 @@ static THD_WORKING_AREA(waShell, 2048);
 namespace acs
 {
 
-void shell_start(SerialDriver *serial_driver, uint32_t baudrate)
-{
-    /* Configure serial port. */
-    static SerialConfig serial_cfg = {};
-    serial_cfg.speed               = baudrate;
-    sdStart(serial_driver, &serial_cfg);
+/* ── Internal: launch shell thread with a given stream ─────────────────── */
 
-    /* Initialize shell manager. */
+static void shell_launch(BaseSequentialStream *stream)
+{
     shellInit();
 
-    /* Configure shell. */
     static ShellConfig shell_cfg = {
-        .sc_channel  = reinterpret_cast<BaseSequentialStream *>(serial_driver),
+        .sc_channel  = stream,
         .sc_commands = shell_commands,
 #if SHELL_USE_HISTORY == TRUE
         .sc_histbuf  = shell_history_buf,
@@ -242,12 +237,25 @@ void shell_start(SerialDriver *serial_driver, uint32_t baudrate)
 #endif
     };
 
-    /* Start shell thread at lowest operational priority. */
     chThdCreateStatic(waShell,
                       sizeof(waShell),
                       NORMALPRIO - 10,
                       shellThread,
                       &shell_cfg);
+}
+
+void shell_start(SerialDriver *serial_driver, uint32_t baudrate)
+{
+    static SerialConfig serial_cfg = {};
+    serial_cfg.speed               = baudrate;
+    sdStart(serial_driver, &serial_cfg);
+
+    shell_launch(reinterpret_cast<BaseSequentialStream *>(serial_driver));
+}
+
+void shell_start(BaseSequentialStream *stream)
+{
+    shell_launch(stream);
 }
 
 }  // namespace acs

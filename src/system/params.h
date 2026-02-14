@@ -32,13 +32,13 @@ struct ParamEntry
  * @brief Get a parameter value by name.
  * @return true if found.
  */
-bool param_get(const char *name, float &out);
+[[nodiscard]] bool param_get(const char *name, float &out);
 
 /**
  * @brief Set a parameter value by name (clamped to [min, max]).
  * @return true if found and value was in range.
  */
-bool param_set(const char *name, float value);
+[[nodiscard]] bool param_set(const char *name, float value);
 
 /**
  * @brief Reset all parameters to their defaults.
@@ -55,6 +55,6 @@ void param_list(BaseSequentialStream *chp);
  * @param count [out] Number of entries.
  * @return Pointer to the param table.
  */
-ParamEntry *param_table(int &count);
+[[nodiscard]] ParamEntry *param_table(int &count);
 
 }  // namespace acs

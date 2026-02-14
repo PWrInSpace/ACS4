@@ -95,10 +95,12 @@ bool param_set(const char *name, float value)
 
 void param_reset_all()
 {
+    chSysLock();
     for (auto &entry : s_params)
     {
         entry.value = entry.default_val;
     }
+    chSysUnlock();
 }
 
 void param_list(BaseSequentialStream *chp)

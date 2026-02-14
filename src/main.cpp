@@ -30,6 +30,19 @@ extern "C" {
 #include "system/watchdog.h"
 #include "utils/timestamp.h"
 
+#if defined(STM32H725xx)
+    #include "system/usb_cdc.h"
+#endif
+
+/* ── Board-specific LED aliases ──────────────────────────────────────────── */
+#if defined(STM32H725xx)
+    #define LINE_STATUS LINE_LED_1
+    #define LINE_ERROR  LINE_LED_3
+#else
+    #define LINE_STATUS LINE_LED1
+    #define LINE_ERROR  LINE_LED3
+#endif
+
 /*---------------------------------------------------------------------------*/
 /* LED blinker thread                                                        */
 /*---------------------------------------------------------------------------*/
@@ -43,23 +56,14 @@ static THD_FUNCTION(Blinker, arg)
 
     while (true)
     {
-#if defined(STM32H725xx)
-        palSetLine(LINE_LED_1);
+        palSetLine(LINE_STATUS);
         chThdSleepMilliseconds(100);
-        palClearLine(LINE_LED_1);
+        palClearLine(LINE_STATUS);
 
-        palSetLine(LINE_LED_3);
+        palSetLine(LINE_ERROR);
         chThdSleepMilliseconds(100);
-        palClearLine(LINE_LED_3);
-#else
-        palSetLine(LINE_LED1);
-        chThdSleepMilliseconds(100);
-        palClearLine(LINE_LED1);
+        palClearLine(LINE_ERROR);
 
-        palSetLine(LINE_LED3);
-        chThdSleepMilliseconds(100);
-        palClearLine(LINE_LED3);
-#endif
         chThdSleepMilliseconds(800);
     }
 }
@@ -85,13 +89,12 @@ int main()
     acs::watchdog_init();
 
     /* Start debug shell.
-     * Custom PCB: USB CDC (TODO: implement USB CDC init).
+     * Custom PCB: USB CDC on PA11/PA12 (OTG_HS in FS mode).
      * Nucleo:     USART3 at 921600 baud via ST-Link VCP. */
 #if defined(STM32H725xx)
-    /* TODO: Initialize USB CDC and start shell on SerialUSBDriver SDU1.
-     * For now, start shell on UART4 (GPS port) for initial bring-up. */
-    acs::shell_start(&SD4, 921600);
-    auto *serial = reinterpret_cast<BaseSequentialStream *>(&SD4);
+    acs::usb_cdc_init();
+    auto *serial = acs::usb_cdc_stream();
+    acs::shell_start(serial);
 #else
     acs::shell_start(&SD3, 921600);
     auto *serial = reinterpret_cast<BaseSequentialStream *>(&SD3);
