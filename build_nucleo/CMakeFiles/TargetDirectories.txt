@@ -1,0 +1,4 @@
+/home/niczke/repos/ACS4/build_nucleo/CMakeFiles/acs4.dir
+/home/niczke/repos/ACS4/build_nucleo/CMakeFiles/flash.dir
+/home/niczke/repos/ACS4/build_nucleo/CMakeFiles/edit_cache.dir
+/home/niczke/repos/ACS4/build_nucleo/CMakeFiles/rebuild_cache.dir

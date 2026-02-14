@@ -1,0 +1,7 @@
+{
+	"InstallScripts" : 
+	[
+		"/home/niczke/repos/ACS4/build_nucleo/cmake_install.cmake"
+	],
+	"Parallel" : false
+}
