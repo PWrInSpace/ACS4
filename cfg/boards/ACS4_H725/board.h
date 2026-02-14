@@ -118,13 +118,11 @@
 /*
  * GPIOB pin assignments.
  *
- * PB0  - CH2_CONT                 (analog, ADC1_INP9, pyro continuity,
+ * PB0  - CH2_CONT                 (input floating, pyro continuity digital,
  *                                  ext 1k pullup to 3V3 + LED, HIGH=open).
  * PB1  - ARMING                   (input floating).
  * PB2  - CH1_CONT                 (input floating, pyro continuity digital,
- *                                  ext 1k pullup to 3V3 + LED, HIGH=open.
- *                                  NOTE: PB2 has no ADC channel on H725,
- *                                  hence digital input unlike PB0/CH2_CONT).
+ *                                  ext 1k pullup to 3V3 + LED, HIGH=open).
  * PB3  - SPI6_SCK                 (alternate 8).
  * PB4  - SPI6_MISO                (alternate 8).
  * PB5  - SPI6_MOSI                (alternate 8).
@@ -540,13 +538,11 @@
 /*
  * GPIOB setup:
  *
- * PB0  - CH2_CONT                 (analog, ADC1_INP9, pyro continuity,
+ * PB0  - CH2_CONT                 (input floating, pyro continuity digital,
  *                                  ext 1k pullup to 3V3 + LED, HIGH=open).
  * PB1  - ARMING                   (input floating).
  * PB2  - CH1_CONT                 (input floating, pyro continuity digital,
- *                                  ext 1k pullup to 3V3 + LED, HIGH=open.
- *                                  NOTE: PB2 has no ADC channel on H725,
- *                                  hence digital input unlike PB0/CH2_CONT).
+ *                                  ext 1k pullup to 3V3 + LED, HIGH=open).
  * PB3  - SPI6_SCK                 (alternate 8, pushpull, high speed).
  * PB4  - SPI6_MISO                (alternate 8, pushpull, high speed).
  * PB5  - SPI6_MOSI                (alternate 8, pushpull, high speed).
@@ -561,7 +557,7 @@
  * PB14 - SPI2_MISO                (alternate 5, pushpull, high speed).
  * PB15 - SPI2_MOSI                (alternate 5, pushpull, high speed).
  */
-#define VAL_GPIOB_MODER             (PIN_MODE_ANALOG(GPIOB_CH2_CONT) |      \
+#define VAL_GPIOB_MODER             (PIN_MODE_INPUT(GPIOB_CH2_CONT) |       \
                                      PIN_MODE_INPUT(GPIOB_ARMING) |          \
                                      PIN_MODE_INPUT(GPIOB_CH1_CONT) |       \
                                      PIN_MODE_ALTERNATE(GPIOB_SPI6_SCK) |    \
