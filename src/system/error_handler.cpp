@@ -36,6 +36,8 @@ static constexpr const char *const s_error_names[] = {
     "I2C_ERR_ARBITRATION",
     "I2C_ERR_NACK",
     "I2C_ERR_TIMEOUT",
+    "SPI_ERR_TIMEOUT",
+    "SPI_ERR_DMA",
     "BARO_COMM_FAIL",
     "MAG_COMM_FAIL",
     "GPS_NO_FIX",

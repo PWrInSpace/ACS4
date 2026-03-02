@@ -37,7 +37,7 @@
 #define HAL_USE_SERIAL                      TRUE
 #define HAL_USE_SERIAL_USB                  FALSE
 #define HAL_USE_SIO                         FALSE
-#define HAL_USE_SPI                         FALSE
+#define HAL_USE_SPI                         TRUE
 #define HAL_USE_TRNG                        FALSE
 #define HAL_USE_UART                        FALSE
 #define HAL_USE_USB                         FALSE
@@ -57,5 +57,14 @@
 
 #define SERIAL_DEFAULT_BITRATE              115200
 #define SERIAL_BUFFERS_SIZE                 256
+
+/*---------------------------------------------------------------------------*/
+/* SPI driver settings                                                       */
+/*---------------------------------------------------------------------------*/
+
+#define SPI_USE_WAIT                        TRUE
+#define SPI_USE_SYNCHRONIZATION             TRUE
+#define SPI_USE_MUTUAL_EXCLUSION            TRUE
+#define SPI_SELECT_MODE                     SPI_SELECT_MODE_NONE
 
 #endif /* HALCONF_H */

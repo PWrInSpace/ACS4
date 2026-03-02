@@ -61,4 +61,13 @@
 #define SERIAL_DEFAULT_BITRATE              115200
 #define SERIAL_BUFFERS_SIZE                 256
 
+/*---------------------------------------------------------------------------*/
+/* SPI driver settings                                                       */
+/*---------------------------------------------------------------------------*/
+
+#define SPI_USE_WAIT                        TRUE
+#define SPI_USE_SYNCHRONIZATION             TRUE
+#define SPI_USE_MUTUAL_EXCLUSION            TRUE
+#define SPI_SELECT_MODE                     SPI_SELECT_MODE_NONE
+
 #endif /* HALCONF_H */
