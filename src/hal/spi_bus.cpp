@@ -19,6 +19,8 @@
 
 #include "hal/spi_bus.h"
 
+#include <cstring>
+
 #include "system/error_handler.h"
 
 extern "C" {
@@ -57,11 +59,8 @@ bool SpiBus::transfer(ioline_t         cs_line,
         return false;
     }
 
-    spiAcquireBus(driver_);
-    spiStart(driver_, &config);
-
-    /* Assert CS (active low). */
-    palClearLine(cs_line);
+    const BusGuard bus(driver_, &config);
+    const CsGuard  cs(cs_line);
 
     /*
      * spiExchange (v2 blocking API):
@@ -71,12 +70,6 @@ bool SpiBus::transfer(ioline_t         cs_line,
      *   - Returns MSG_OK on success, MSG_TIMEOUT / MSG_RESET on failure.
      */
     const msg_t status = spiExchange(driver_, len, tx, rx);
-
-    /* Deassert CS. */
-    palSetLine(cs_line);
-
-    spiStop(driver_);
-    spiReleaseBus(driver_);
 
     if (status != MSG_OK)
     {
@@ -99,15 +92,10 @@ bool SpiBus::send(ioline_t         cs_line,
         return false;
     }
 
-    spiAcquireBus(driver_);
-    spiStart(driver_, &config);
+    const BusGuard bus(driver_, &config);
+    const CsGuard  cs(cs_line);
 
-    palClearLine(cs_line);
     const msg_t status = spiSend(driver_, len, tx);
-    palSetLine(cs_line);
-
-    spiStop(driver_);
-    spiReleaseBus(driver_);
 
     if (status != MSG_OK)
     {
@@ -130,15 +118,10 @@ bool SpiBus::receive(ioline_t         cs_line,
         return false;
     }
 
-    spiAcquireBus(driver_);
-    spiStart(driver_, &config);
+    const BusGuard bus(driver_, &config);
+    const CsGuard  cs(cs_line);
 
-    palClearLine(cs_line);
     const msg_t status = spiReceive(driver_, len, rx);
-    palSetLine(cs_line);
-
-    spiStop(driver_);
-    spiReleaseBus(driver_);
 
     if (status != MSG_OK)
     {
@@ -151,7 +134,7 @@ bool SpiBus::receive(ioline_t         cs_line,
 
 /* ── Read single register ─────────────────────────────────────────────── */
 
-uint8_t
+std::optional<uint8_t>
 SpiBus::read_register(ioline_t cs_line, uint8_t reg, const SPIConfig &config)
 {
     /*
@@ -167,7 +150,7 @@ SpiBus::read_register(ioline_t cs_line, uint8_t reg, const SPIConfig &config)
 
     if (!transfer(cs_line, tx_buf, rx_buf, 2, config))
     {
-        return 0x00;
+        return std::nullopt;
     }
 
     return rx_buf[1];
@@ -219,14 +202,11 @@ bool SpiBus::read_registers(ioline_t         cs_line,
         return false;
     }
 
-    uint8_t tx_buf[kMaxBurst + 1];
-    uint8_t rx_buf[kMaxBurst + 1];
+    uint8_t tx_buf[kMaxBurst + 1] = {};
+    uint8_t rx_buf[kMaxBurst + 1] = {};
 
     tx_buf[0] = static_cast<uint8_t>(reg | 0x80U);
-    for (size_t i = 1; i <= len; i++)
-    {
-        tx_buf[i] = 0x00U;
-    }
+    /* Remaining tx bytes are already zero-initialized. */
 
     if (!transfer(cs_line, tx_buf, rx_buf, len + 1, config))
     {
@@ -234,10 +214,7 @@ bool SpiBus::read_registers(ioline_t         cs_line,
     }
 
     /* Skip the first junk byte. */
-    for (size_t i = 0; i < len; i++)
-    {
-        buf[i] = rx_buf[i + 1];
-    }
+    std::memcpy(buf, &rx_buf[1], len);
 
     return true;
 }

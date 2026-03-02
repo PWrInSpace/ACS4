@@ -3,7 +3,7 @@
  *
  * Wraps ChibiOS SPIDriver (v2 API) with:
  *   - DMA transfers (via HAL SPIv3 LLD, circular mode off)
- *   - Blocking operations with timeout (5ms default)
+ *   - Blocking operations (DMA with synchronization)
  *   - Mutex-protected bus access (spiAcquireBus/spiReleaseBus)
  *   - Multiple chip-select support (software CS via PAL lines)
  *   - Error reporting via acs::error_report()
@@ -43,14 +43,15 @@
  *   static const SPIConfig imu_cfg = { false, nullptr, nullptr,
  *       SPI_CFG1_MBR_DIV8, SPI_CFG2_CPOL | SPI_CFG2_CPHA };
  *
- *   uint8_t who = spi.read_register(LINE_IMU_CS, 0x75, imu_cfg);
- *   spi.write_register(LINE_IMU_CS, 0x11, 0x0F, imu_cfg);
+ *   auto who = spi.read_register(LINE_IMU_CS, 0x75, imu_cfg); //
+ * std::optional<uint8_t> spi.write_register(LINE_IMU_CS, 0x11, 0x0F, imu_cfg);
  */
 
 #pragma once
 
 #include <cstddef>
 #include <cstdint>
+#include <optional>
 
 extern "C" {
 #include "hal.h"
@@ -72,6 +73,13 @@ namespace acs
 class SpiBus
 {
   public:
+    SpiBus()                          = default;
+    ~SpiBus()                         = default;
+    SpiBus(const SpiBus &)            = delete;
+    SpiBus &operator=(const SpiBus &) = delete;
+    SpiBus(SpiBus &&)                 = delete;
+    SpiBus &operator=(SpiBus &&)      = delete;
+
     /**
      * @brief Initialize the SPI bus.
      *
@@ -82,7 +90,7 @@ class SpiBus
      *       so that devices with different CPOL/CPHA/prescaler can
      *       share one physical bus.
      */
-    bool init(SPIDriver *driver);
+    [[nodiscard]] bool init(SPIDriver *driver);
 
     /**
      * @brief Full-duplex SPI exchange with a specific device.
@@ -102,11 +110,11 @@ class SpiBus
      * @param config   SPI configuration for this device.
      * @return true on success, false on timeout / DMA error.
      */
-    bool transfer(ioline_t         cs_line,
-                  const uint8_t   *tx,
-                  uint8_t         *rx,
-                  size_t           len,
-                  const SPIConfig &config);
+    [[nodiscard]] bool transfer(ioline_t         cs_line,
+                                const uint8_t   *tx,
+                                uint8_t         *rx,
+                                size_t           len,
+                                const SPIConfig &config);
 
     /**
      * @brief TX-only transfer (discard received data).
@@ -117,10 +125,10 @@ class SpiBus
      * @param config   SPI configuration for this device.
      * @return true on success, false on timeout / DMA error.
      */
-    bool send(ioline_t         cs_line,
-              const uint8_t   *tx,
-              size_t           len,
-              const SPIConfig &config);
+    [[nodiscard]] bool send(ioline_t         cs_line,
+                            const uint8_t   *tx,
+                            size_t           len,
+                            const SPIConfig &config);
 
     /**
      * @brief RX-only transfer (send 0xFF bytes, capture response).
@@ -131,7 +139,7 @@ class SpiBus
      * @param config   SPI configuration for this device.
      * @return true on success, false on timeout / DMA error.
      */
-    bool
+    [[nodiscard]] bool
     receive(ioline_t cs_line, uint8_t *rx, size_t len, const SPIConfig &config);
 
     /**
@@ -142,9 +150,9 @@ class SpiBus
      * @param cs_line  PAL line for chip select.
      * @param reg      Register address (bit 7 will be set for read).
      * @param config   SPI configuration.
-     * @return Register value, or 0x00 on failure.
+     * @return Register value, or std::nullopt on failure.
      */
-    uint8_t
+    [[nodiscard]] std::optional<uint8_t>
     read_register(ioline_t cs_line, uint8_t reg, const SPIConfig &config);
 
     /**
@@ -158,10 +166,10 @@ class SpiBus
      * @param config   SPI configuration.
      * @return true on success.
      */
-    bool write_register(ioline_t         cs_line,
-                        uint8_t          reg,
-                        uint8_t          value,
-                        const SPIConfig &config);
+    [[nodiscard]] bool write_register(ioline_t         cs_line,
+                                      uint8_t          reg,
+                                      uint8_t          value,
+                                      const SPIConfig &config);
 
     /**
      * @brief Read a burst of registers starting at `reg`.
@@ -175,11 +183,11 @@ class SpiBus
      * @param config   SPI configuration.
      * @return true on success.
      */
-    bool read_registers(ioline_t         cs_line,
-                        uint8_t          reg,
-                        uint8_t         *buf,
-                        size_t           len,
-                        const SPIConfig &config);
+    [[nodiscard]] bool read_registers(ioline_t         cs_line,
+                                      uint8_t          reg,
+                                      uint8_t         *buf,
+                                      size_t           len,
+                                      const SPIConfig &config);
 
     /**
      * @brief Get the number of failed transfers since init.
@@ -190,7 +198,49 @@ class SpiBus
     }
 
   private:
-    static constexpr sysinterval_t kTimeout = TIME_MS2I(5); /* 5 ms */
+    /** @brief RAII guard for spiAcquireBus+spiStart / spiStop+spiReleaseBus. */
+    class BusGuard
+    {
+      public:
+        BusGuard(SPIDriver *d, const SPIConfig *cfg) : d_(d)
+        {
+            spiAcquireBus(d_);
+            spiStart(d_, cfg);
+        }
+
+        ~BusGuard()
+        {
+            spiStop(d_);
+            spiReleaseBus(d_);
+        }
+
+        BusGuard(const BusGuard &)            = delete;
+        BusGuard &operator=(const BusGuard &) = delete;
+
+      private:
+        SPIDriver *d_;
+    };
+
+    /** @brief RAII guard for CS assert (active-low) / deassert. */
+    class CsGuard
+    {
+      public:
+        explicit CsGuard(ioline_t cs) : cs_(cs)
+        {
+            palClearLine(cs_);
+        }
+
+        ~CsGuard()
+        {
+            palSetLine(cs_);
+        }
+
+        CsGuard(const CsGuard &)            = delete;
+        CsGuard &operator=(const CsGuard &) = delete;
+
+      private:
+        ioline_t cs_;
+    };
 
     SPIDriver *driver_      = nullptr;
     uint32_t   error_count_ = 0;

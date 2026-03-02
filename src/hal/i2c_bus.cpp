@@ -55,15 +55,14 @@ bool I2cBus::write_read(uint8_t        addr,
         return false;
     }
 
-    i2cAcquireBus(driver_);
-    const msg_t status = i2cMasterTransmitTimeout(driver_,
+    const BusGuard lock(driver_);
+    const msg_t    status = i2cMasterTransmitTimeout(driver_,
                                                   addr,
                                                   tx,
                                                   tx_len,
                                                   rx,
                                                   rx_len,
                                                   kTimeout);
-    i2cReleaseBus(driver_);
 
     if (status != MSG_OK)
     {
@@ -82,15 +81,14 @@ bool I2cBus::write(uint8_t addr, const uint8_t *tx, size_t tx_len)
         return false;
     }
 
-    i2cAcquireBus(driver_);
-    const msg_t status = i2cMasterTransmitTimeout(driver_,
+    const BusGuard lock(driver_);
+    const msg_t    status = i2cMasterTransmitTimeout(driver_,
                                                   addr,
                                                   tx,
                                                   tx_len,
                                                   nullptr,
                                                   0,
                                                   kTimeout);
-    i2cReleaseBus(driver_);
 
     if (status != MSG_OK)
     {
@@ -109,10 +107,9 @@ bool I2cBus::read(uint8_t addr, uint8_t *rx, size_t rx_len)
         return false;
     }
 
-    i2cAcquireBus(driver_);
-    const msg_t status =
+    const BusGuard lock(driver_);
+    const msg_t    status =
         i2cMasterReceiveTimeout(driver_, addr, rx, rx_len, kTimeout);
-    i2cReleaseBus(driver_);
 
     if (status != MSG_OK)
     {
@@ -132,16 +129,15 @@ bool I2cBus::probe(uint8_t addr)
     }
 
     /* Send a zero-byte write; device will ACK if present. */
-    const uint8_t dummy = 0;
-    i2cAcquireBus(driver_);
-    const msg_t status = i2cMasterTransmitTimeout(driver_,
+    const uint8_t  dummy = 0;
+    const BusGuard lock(driver_);
+    const msg_t    status = i2cMasterTransmitTimeout(driver_,
                                                   addr,
                                                   &dummy,
                                                   0,
                                                   nullptr,
                                                   0,
                                                   kTimeout);
-    i2cReleaseBus(driver_);
 
     if (status != MSG_OK)
     {
@@ -260,7 +256,7 @@ void I2cBus::handle_error()
     /* Attempt bus recovery only on bus-level errors (not simple NACKs). */
     if ((errors & (I2C_BUS_ERROR | I2C_ARBITRATION_LOST)) != 0u)
     {
-        bus_recovery();
+        (void)bus_recovery();
     }
 }
 

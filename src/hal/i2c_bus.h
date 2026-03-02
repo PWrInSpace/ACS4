@@ -39,6 +39,13 @@ namespace acs
 class I2cBus
 {
   public:
+    I2cBus()                          = default;
+    ~I2cBus()                         = default;
+    I2cBus(const I2cBus &)            = delete;
+    I2cBus &operator=(const I2cBus &) = delete;
+    I2cBus(I2cBus &&)                 = delete;
+    I2cBus &operator=(I2cBus &&)      = delete;
+
     /**
      * @brief Default I2C configuration: 400 kHz Fast Mode.
      *
@@ -64,10 +71,10 @@ class I2cBus
      * @param sda_line PAL line for SDA (needed for bus recovery).
      * @return true on success, false if driver is null.
      */
-    bool init(I2CDriver       *driver,
-              const I2CConfig &config,
-              ioline_t         scl_line,
-              ioline_t         sda_line);
+    [[nodiscard]] bool init(I2CDriver       *driver,
+                            const I2CConfig &config,
+                            ioline_t         scl_line,
+                            ioline_t         sda_line);
 
     /**
      * @brief Write then read from an I2C device (combined transaction).
@@ -82,11 +89,11 @@ class I2cBus
      * @param rx_len  Number of bytes to receive.
      * @return true on success, false on timeout/NACK/bus error.
      */
-    bool write_read(uint8_t        addr,
-                    const uint8_t *tx,
-                    size_t         tx_len,
-                    uint8_t       *rx,
-                    size_t         rx_len);
+    [[nodiscard]] bool write_read(uint8_t        addr,
+                                  const uint8_t *tx,
+                                  size_t         tx_len,
+                                  uint8_t       *rx,
+                                  size_t         rx_len);
 
     /**
      * @brief Write-only transaction.
@@ -96,7 +103,7 @@ class I2cBus
      * @param tx_len  Number of bytes to transmit.
      * @return true on success.
      */
-    bool write(uint8_t addr, const uint8_t *tx, size_t tx_len);
+    [[nodiscard]] bool write(uint8_t addr, const uint8_t *tx, size_t tx_len);
 
     /**
      * @brief Read-only transaction (no register address sent first).
@@ -106,7 +113,7 @@ class I2cBus
      * @param rx_len  Number of bytes to read.
      * @return true on success.
      */
-    bool read(uint8_t addr, uint8_t *rx, size_t rx_len);
+    [[nodiscard]] bool read(uint8_t addr, uint8_t *rx, size_t rx_len);
 
     /**
      * @brief Perform I2C bus recovery (9 SCL clock pulses).
@@ -117,7 +124,7 @@ class I2cBus
      *
      * @return true if SDA was released, false if still stuck.
      */
-    bool bus_recovery();
+    [[nodiscard]] bool bus_recovery();
 
     /**
      * @brief Check if a device responds at the given address.
@@ -127,7 +134,7 @@ class I2cBus
      * @param addr 7-bit I2C slave address.
      * @return true if device ACK'd.
      */
-    bool probe(uint8_t addr);
+    [[nodiscard]] bool probe(uint8_t addr);
 
     /**
      * @brief Get the number of failed transactions since init.
@@ -147,6 +154,27 @@ class I2cBus
 
   private:
     static constexpr sysinterval_t kTimeout = TIME_MS2I(10); /* 10 ms */
+
+    /** @brief RAII guard for i2cAcquireBus / i2cReleaseBus. */
+    class BusGuard
+    {
+      public:
+        explicit BusGuard(I2CDriver *d) : d_(d)
+        {
+            i2cAcquireBus(d_);
+        }
+
+        ~BusGuard()
+        {
+            i2cReleaseBus(d_);
+        }
+
+        BusGuard(const BusGuard &)            = delete;
+        BusGuard &operator=(const BusGuard &) = delete;
+
+      private:
+        I2CDriver *d_;
+    };
 
     I2CDriver *driver_         = nullptr;
     I2CConfig  config_         = {};
