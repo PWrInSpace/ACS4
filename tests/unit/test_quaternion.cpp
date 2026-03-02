@@ -12,11 +12,10 @@
  *   - numerical stability (repeated normalize)
  */
 
+#include <cmath>
 #include <gtest/gtest.h>
 
 #include "navigation/quaternion.h"
-
-#include <cmath>
 
 using namespace acs::nav;
 
@@ -26,21 +25,21 @@ static constexpr float PI      = 3.14159265358979323846f;
 static constexpr float DEG2RAD = PI / 180.0f;
 static constexpr float RAD2DEG = 180.0f / PI;
 static constexpr float TOL     = 1e-5f;
-static constexpr float TOL_DEG = 0.1f * DEG2RAD;   /* 0.1° in rad */
+static constexpr float TOL_DEG = 0.1f * DEG2RAD; /* 0.1° in rad */
 
 /** Check that quaternion is approximately equal (handles q ≈ -q ambiguity). */
-static void EXPECT_QUAT_NEAR(const Quat& a, const Quat& b, float tol = TOL)
+static void EXPECT_QUAT_NEAR(const Quat &a, const Quat &b, float tol = TOL)
 {
     /* q and -q represent the same rotation */
-    float dot = std::fabs(a.w() * b.w() + a.x() * b.x() +
-                          a.y() * b.y() + a.z() * b.z());
+    float dot = std::fabs(a.w() * b.w() + a.x() * b.x() + a.y() * b.y()
+                          + a.z() * b.z());
     EXPECT_NEAR(dot, 1.0f, tol)
-        << "Quaternions differ: ["
-        << a.w() << "," << a.x() << "," << a.y() << "," << a.z() << "] vs ["
-        << b.w() << "," << b.x() << "," << b.y() << "," << b.z() << "]";
+        << "Quaternions differ: [" << a.w() << "," << a.x() << "," << a.y()
+        << "," << a.z() << "] vs [" << b.w() << "," << b.x() << "," << b.y()
+        << "," << b.z() << "]";
 }
 
-static void EXPECT_VEC3_NEAR(const Vec3& a, const Vec3& b, float tol = TOL)
+static void EXPECT_VEC3_NEAR(const Vec3 &a, const Vec3 &b, float tol = TOL)
 {
     EXPECT_NEAR(a.x(), b.x(), tol);
     EXPECT_NEAR(a.y(), b.y(), tol);
@@ -49,7 +48,8 @@ static void EXPECT_VEC3_NEAR(const Vec3& a, const Vec3& b, float tol = TOL)
 
 /* ═══════════════════════════════════════════════════════════════════════════
  * Normalize
- * ═══════════════════════════════════════════════════════════════════════════ */
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
 
 TEST(QuatNormalize, UnnormalizedBecomesUnit)
 {
@@ -85,7 +85,8 @@ TEST(QuatNormalize, RepeatedNormalize1000x)
 {
     /* Numerical stability: 1000× normalize must not drift. */
     Quat q = quat_from_euler(0.3f, 0.5f, 1.2f);
-    for (int i = 0; i < 1000; ++i) {
+    for (int i = 0; i < 1000; ++i)
+    {
         q = quat_normalize(q);
     }
     EXPECT_NEAR(q.norm(), 1.0f, TOL);
@@ -93,11 +94,12 @@ TEST(QuatNormalize, RepeatedNormalize1000x)
 
 /* ═══════════════════════════════════════════════════════════════════════════
  * Multiply & Conjugate
- * ═══════════════════════════════════════════════════════════════════════════ */
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
 
 TEST(QuatMultiply, QTimesConjugateIsIdentity)
 {
-    Quat q = quat_from_euler(0.1f, 0.2f, 0.3f);
+    Quat q      = quat_from_euler(0.1f, 0.2f, 0.3f);
     Quat result = quat_multiply(q, quat_conjugate(q));
     EXPECT_QUAT_NEAR(result, quat_identity());
 }
@@ -112,15 +114,16 @@ TEST(QuatMultiply, IdentityIsNeutral)
 TEST(QuatMultiply, TwoRotationsCompose)
 {
     /* 90° about Z then 90° about Z = 180° about Z */
-    Quat q90z = quat_from_axis_angle(Vec3::UnitZ(), 90.0f * DEG2RAD);
-    Quat q180z = quat_multiply(q90z, q90z);
+    Quat q90z     = quat_from_axis_angle(Vec3::UnitZ(), 90.0f * DEG2RAD);
+    Quat q180z    = quat_multiply(q90z, q90z);
     Quat expected = quat_from_axis_angle(Vec3::UnitZ(), 180.0f * DEG2RAD);
     EXPECT_QUAT_NEAR(q180z, expected);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
  * Construction: rotation vector
- * ═══════════════════════════════════════════════════════════════════════════ */
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
 
 TEST(QuatFromRotVec, ZeroIsIdentity)
 {
@@ -131,9 +134,9 @@ TEST(QuatFromRotVec, ZeroIsIdentity)
 TEST(QuatFromRotVec, NinetyDegAboutZ)
 {
     float angle = 90.0f * DEG2RAD;
-    Vec3 rv(0.0f, 0.0f, angle);
-    Quat q = quat_from_rotation_vector(rv);
-    Quat expected = quat_from_axis_angle(Vec3::UnitZ(), angle);
+    Vec3  rv(0.0f, 0.0f, angle);
+    Quat  q        = quat_from_rotation_vector(rv);
+    Quat  expected = quat_from_axis_angle(Vec3::UnitZ(), angle);
     EXPECT_QUAT_NEAR(q, expected);
 }
 
@@ -148,7 +151,8 @@ TEST(QuatFromRotVec, SmallAngle)
 
 /* ═══════════════════════════════════════════════════════════════════════════
  * Construction: axis-angle
- * ═══════════════════════════════════════════════════════════════════════════ */
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
 
 TEST(QuatFromAxisAngle, ZeroAngleIsIdentity)
 {
@@ -172,7 +176,8 @@ TEST(QuatFromAxisAngle, OneEightyDeg)
 
 /* ═══════════════════════════════════════════════════════════════════════════
  * Construction: Euler
- * ═══════════════════════════════════════════════════════════════════════════ */
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
 
 TEST(QuatFromEuler, ZerosIsIdentity)
 {
@@ -182,26 +187,27 @@ TEST(QuatFromEuler, ZerosIsIdentity)
 
 TEST(QuatFromEuler, PureYaw90)
 {
-    Quat q = quat_from_euler(0.0f, 0.0f, 90.0f * DEG2RAD);
+    Quat q        = quat_from_euler(0.0f, 0.0f, 90.0f * DEG2RAD);
     Quat expected = quat_from_axis_angle(Vec3::UnitZ(), 90.0f * DEG2RAD);
     EXPECT_QUAT_NEAR(q, expected);
 }
 
 TEST(QuatFromEuler, PurePitch45)
 {
-    Quat q = quat_from_euler(0.0f, 45.0f * DEG2RAD, 0.0f);
+    Quat q        = quat_from_euler(0.0f, 45.0f * DEG2RAD, 0.0f);
     Quat expected = quat_from_axis_angle(Vec3::UnitY(), 45.0f * DEG2RAD);
     EXPECT_QUAT_NEAR(q, expected);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
  * Rotate vector
- * ═══════════════════════════════════════════════════════════════════════════ */
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
 
 TEST(QuatRotateVector, NinetyDegAboutZ)
 {
     /* Roadmap test: 90° about Z rotates {1,0,0} → {0,1,0} */
-    Quat q = quat_from_axis_angle(Vec3::UnitZ(), 90.0f * DEG2RAD);
+    Quat q      = quat_from_axis_angle(Vec3::UnitZ(), 90.0f * DEG2RAD);
     Vec3 result = quat_rotate_vector(q, Vec3::UnitX());
     EXPECT_VEC3_NEAR(result, Vec3::UnitY());
 }
@@ -215,7 +221,7 @@ TEST(QuatRotateVector, IdentityLeavesVectorUnchanged)
 
 TEST(QuatRotateVector, OneEightyAboutX)
 {
-    Quat q = quat_from_axis_angle(Vec3::UnitX(), PI);
+    Quat q      = quat_from_axis_angle(Vec3::UnitX(), PI);
     Vec3 result = quat_rotate_vector(q, Vec3::UnitY());
     EXPECT_VEC3_NEAR(result, Vec3(0.0f, -1.0f, 0.0f));
 }
@@ -231,7 +237,8 @@ TEST(QuatRotateVector, ConjugateIsInverse)
 
 /* ═══════════════════════════════════════════════════════════════════════════
  * DCM
- * ═══════════════════════════════════════════════════════════════════════════ */
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
 
 TEST(QuatToDcm, IdentityIsDiag)
 {
@@ -253,7 +260,8 @@ TEST(QuatToDcm, ConsistentWithRotateVector)
 
 /* ═══════════════════════════════════════════════════════════════════════════
  * Euler extraction
- * ═══════════════════════════════════════════════════════════════════════════ */
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
 
 TEST(QuatToEuler, IdentityIsZero)
 {
@@ -270,7 +278,7 @@ TEST(QuatToEuler, RoundTrip)
     float p_in = 25.0f * DEG2RAD;
     float y_in = -60.0f * DEG2RAD;
 
-    Quat q = quat_from_euler(r_in, p_in, y_in);
+    Quat  q = quat_from_euler(r_in, p_in, y_in);
     float r_out, p_out, y_out;
     quat_to_euler(q, r_out, p_out, y_out);
 
@@ -283,7 +291,7 @@ TEST(QuatToEuler, GimbalLock90Pitch)
 {
     /* pitch = +90° (gimbal lock) — roll and yaw degenerate but sum is defined.
      * Just verify no NaN/crash. */
-    Quat q = quat_from_euler(0.0f, 90.0f * DEG2RAD, 0.0f);
+    Quat  q = quat_from_euler(0.0f, 90.0f * DEG2RAD, 0.0f);
     float r, p, y;
     quat_to_euler(q, r, p, y);
     EXPECT_FALSE(std::isnan(r));
@@ -298,7 +306,7 @@ TEST(QuatToEuler, NegativePitch)
     float p_in = -30.0f * DEG2RAD;
     float y_in = 0.0f;
 
-    Quat q = quat_from_euler(r_in, p_in, y_in);
+    Quat  q = quat_from_euler(r_in, p_in, y_in);
     float r_out, p_out, y_out;
     quat_to_euler(q, r_out, p_out, y_out);
 
@@ -307,11 +315,12 @@ TEST(QuatToEuler, NegativePitch)
 
 /* ═══════════════════════════════════════════════════════════════════════════
  * Integration (gyroscope)
- * ═══════════════════════════════════════════════════════════════════════════ */
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
 
 TEST(QuatIntegrate, ZeroOmegaNoChange)
 {
-    Quat q = quat_from_euler(0.1f, 0.2f, 0.3f);
+    Quat q  = quat_from_euler(0.1f, 0.2f, 0.3f);
     Quat q2 = quat_integrate(q, Vec3::Zero(), 0.001f);
     EXPECT_QUAT_NEAR(q, q2);
 }
@@ -320,7 +329,7 @@ TEST(QuatIntegrate, SmallYawRotation)
 {
     /* Roadmap test: identity + omega_z=1 rad/s, dt=0.001 → small yaw */
     Quat q = quat_identity();
-    Vec3 omega(0.0f, 0.0f, 1.0f);  /* 1 rad/s about Z */
+    Vec3 omega(0.0f, 0.0f, 1.0f); /* 1 rad/s about Z */
     Quat q2 = quat_integrate(q, omega, 0.001f);
 
     float r, p, y;
@@ -328,33 +337,35 @@ TEST(QuatIntegrate, SmallYawRotation)
 
     EXPECT_NEAR(r, 0.0f, TOL_DEG);
     EXPECT_NEAR(p, 0.0f, TOL_DEG);
-    EXPECT_NEAR(y, 0.001f, 1e-4f);  /* expect ~0.001 rad yaw */
+    EXPECT_NEAR(y, 0.001f, 1e-4f); /* expect ~0.001 rad yaw */
 }
 
 TEST(QuatIntegrate, ConstantRotation90Deg)
 {
     /* Constant 90°/s about Z for 1 second (1000 steps × 1 ms).
      * Final yaw ≈ 90° = π/2 rad. */
-    Quat q = quat_identity();
-    const float omega_z = 90.0f * DEG2RAD;   /* 90°/s  */
-    const Vec3 omega(0.0f, 0.0f, omega_z);
+    Quat        q       = quat_identity();
+    const float omega_z = 90.0f * DEG2RAD; /* 90°/s  */
+    const Vec3  omega(0.0f, 0.0f, omega_z);
     const float dt = 0.001f;
 
-    for (int i = 0; i < 1000; ++i) {
+    for (int i = 0; i < 1000; ++i)
+    {
         q = quat_integrate(q, omega, dt);
     }
 
     float r, p, y;
     quat_to_euler(q, r, p, y);
 
-    EXPECT_NEAR(y, 90.0f * DEG2RAD, 1.0f * DEG2RAD);  /* ±1° tolerance */
+    EXPECT_NEAR(y, 90.0f * DEG2RAD, 1.0f * DEG2RAD); /* ±1° tolerance */
 }
 
 TEST(QuatIntegrate, ResultIsNormalized)
 {
     Quat q = quat_identity();
     Vec3 omega(1.0f, 0.5f, -0.3f);
-    for (int i = 0; i < 10000; ++i) {
+    for (int i = 0; i < 10000; ++i)
+    {
         q = quat_integrate(q, omega, 0.001f);
     }
     EXPECT_NEAR(q.norm(), 1.0f, TOL);
@@ -362,7 +373,8 @@ TEST(QuatIntegrate, ResultIsNormalized)
 
 /* ═══════════════════════════════════════════════════════════════════════════
  * Error angle
- * ═══════════════════════════════════════════════════════════════════════════ */
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
 
 TEST(QuatErrorAngle, SameQuatIsZero)
 {
@@ -394,11 +406,12 @@ TEST(QuatErrorAngle, OneEightyDeg)
 
 /* ═══════════════════════════════════════════════════════════════════════════
  * Error vector (attitude control)
- * ═══════════════════════════════════════════════════════════════════════════ */
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
 
 TEST(QuatErrorVector, SameQuatIsZero)
 {
-    Quat q = quat_from_euler(0.1f, 0.2f, 0.3f);
+    Quat q   = quat_from_euler(0.1f, 0.2f, 0.3f);
     Vec3 err = quat_error_vector(q, q);
     EXPECT_VEC3_NEAR(err, Vec3::Zero());
 }
@@ -407,7 +420,7 @@ TEST(QuatErrorVector, SmallPitchError)
 {
     Quat current = quat_identity();
     Quat desired = quat_from_euler(0.0f, 10.0f * DEG2RAD, 0.0f);
-    Vec3 err = quat_error_vector(current, desired);
+    Vec3 err     = quat_error_vector(current, desired);
 
     /* Error should be approximately [0, 0.1745, 0] (10° in rad about Y) */
     EXPECT_NEAR(err.x(), 0.0f, TOL);
@@ -420,7 +433,7 @@ TEST(QuatErrorVector, DirectionIsCorrect)
     /* current = 0°, desired = +5° roll  →  positive X error (roll right) */
     Quat current = quat_identity();
     Quat desired = quat_from_euler(5.0f * DEG2RAD, 0.0f, 0.0f);
-    Vec3 err = quat_error_vector(current, desired);
+    Vec3 err     = quat_error_vector(current, desired);
     EXPECT_GT(err.x(), 0.0f);
 }
 
@@ -432,7 +445,7 @@ TEST(QuatErrorVector, ShortestPath)
      * for attitude control (correct direction, bounded magnitude). */
     Quat current = quat_identity();
     Quat desired = quat_from_axis_angle(Vec3::UnitZ(), 170.0f * DEG2RAD);
-    Vec3 err = quat_error_vector(current, desired);
+    Vec3 err     = quat_error_vector(current, desired);
 
     /* Direction must be correct (positive Z for positive yaw error). */
     EXPECT_GT(err.z(), 0.0f);
@@ -444,19 +457,20 @@ TEST(QuatErrorVector, ShortestPath)
     /* Verify it's still shorter than going the "long way" (190°).
      * 190° would mean negative Z direction if shortest path failed. */
     Quat desired2 = quat_from_axis_angle(Vec3::UnitZ(), -190.0f * DEG2RAD);
-    Vec3 err2 = quat_error_vector(current, desired2);
-    EXPECT_GT(err2.z(), 0.0f);  /* should still be +Z (170° short way) */
+    Vec3 err2     = quat_error_vector(current, desired2);
+    EXPECT_GT(err2.z(), 0.0f); /* should still be +Z (170° short way) */
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
  * Cross-function consistency
- * ═══════════════════════════════════════════════════════════════════════════ */
+ * ═══════════════════════════════════════════════════════════════════════════
+ */
 
 TEST(QuatConsistency, RotVecAndAxisAngleAgree)
 {
     float angle = 37.0f * DEG2RAD;
-    Vec3 axis = Vec3(1.0f, 2.0f, 3.0f).normalized();
-    Vec3 rv = axis * angle;
+    Vec3  axis  = Vec3(1.0f, 2.0f, 3.0f).normalized();
+    Vec3  rv    = axis * angle;
 
     Quat from_rv = quat_from_rotation_vector(rv);
     Quat from_aa = quat_from_axis_angle(axis, angle);
@@ -467,20 +481,21 @@ TEST(QuatConsistency, FromEulerToEulerRoundTripMultiple)
 {
     /* Test several angle combinations */
     float angles[][3] = {
-        {0.0f, 0.0f, 0.0f},
-        {30.0f, 0.0f, 0.0f},
-        {0.0f, 45.0f, 0.0f},
-        {0.0f, 0.0f, -120.0f},
-        {15.0f, -25.0f, 60.0f},
-        {-10.0f, 80.0f, -170.0f},
+        {  0.0f,   0.0f,    0.0f},
+        { 30.0f,   0.0f,    0.0f},
+        {  0.0f,  45.0f,    0.0f},
+        {  0.0f,   0.0f, -120.0f},
+        { 15.0f, -25.0f,   60.0f},
+        {-10.0f,  80.0f, -170.0f},
     };
 
-    for (auto& a : angles) {
+    for (auto &a : angles)
+    {
         float r_in = a[0] * DEG2RAD;
         float p_in = a[1] * DEG2RAD;
         float y_in = a[2] * DEG2RAD;
 
-        Quat q = quat_from_euler(r_in, p_in, y_in);
+        Quat  q = quat_from_euler(r_in, p_in, y_in);
         float r_out, p_out, y_out;
         quat_to_euler(q, r_out, p_out, y_out);
 

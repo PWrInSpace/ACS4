@@ -65,7 +65,7 @@ inline int profiler_register(const char *name)
         return -1;
     }
     const int id   = n++;
-    auto &s        = profiler_slot(id);
+    auto     &s    = profiler_slot(id);
     s.name         = name;
     s.last_cycles  = 0;
     s.max_cycles   = 0;
@@ -88,8 +88,8 @@ inline void profiler_begin(int slot_id)
 inline void profiler_end(int slot_id)
 {
     const uint32_t now   = DWT->CYCCNT;
-    auto            &s    = profiler_slot(slot_id);
-    const uint32_t   delta = now - s.start_cycle; /* handles wrap correctly */
+    auto          &s     = profiler_slot(slot_id);
+    const uint32_t delta = now - s.start_cycle; /* handles wrap correctly */
 
     s.last_cycles = delta;
     s.total_cycles += delta;
@@ -125,7 +125,7 @@ inline void profiler_print(BaseSequentialStream *chp)
 
     for (int i = 0; i < n && i < PROFILER_MAX_SLOTS; i++)
     {
-        auto &s = profiler_slot(i);
+        auto       &s = profiler_slot(i);
         const float avg_us =
             (s.count > 0)
                 ? cycles_to_us(static_cast<uint32_t>(s.total_cycles / s.count))

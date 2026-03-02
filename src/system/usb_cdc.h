@@ -35,4 +35,3 @@ void usb_cdc_init();
 BaseSequentialStream *usb_cdc_stream();
 
 }  // namespace acs
-

@@ -50,10 +50,10 @@ static void cmd_uptime(BaseSequentialStream *chp, int argc, char *argv[])
 {
     (void)argc;
     (void)argv;
-    const auto ms = static_cast<uint32_t>(chTimeI2MS(chVTGetSystemTimeX()));
-    const uint32_t s = ms / 1000;
-    const uint32_t m = s / 60;
-    const uint32_t h = m / 60;
+    const auto     ms = static_cast<uint32_t>(chTimeI2MS(chVTGetSystemTimeX()));
+    const uint32_t s  = ms / 1000;
+    const uint32_t m  = s / 60;
+    const uint32_t h  = m / 60;
     chprintf(chp,
              "Uptime: %lu:%02lu:%02lu (%lu ms)\r\n",
              h,
