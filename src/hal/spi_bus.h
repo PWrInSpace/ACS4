@@ -110,11 +110,8 @@ class SpiBus
      * @param config   SPI configuration for this device.
      * @return true on success, false on timeout / DMA error.
      */
-    [[nodiscard]] bool transfer(ioline_t         cs_line,
-                                const uint8_t   *tx,
-                                uint8_t         *rx,
-                                size_t           len,
-                                const SPIConfig &config);
+    [[nodiscard]] bool
+    transfer(ioline_t cs_line, const uint8_t *tx, uint8_t *rx, size_t len, const SPIConfig &config);
 
     /**
      * @brief TX-only transfer (discard received data).
@@ -125,10 +122,8 @@ class SpiBus
      * @param config   SPI configuration for this device.
      * @return true on success, false on timeout / DMA error.
      */
-    [[nodiscard]] bool send(ioline_t         cs_line,
-                            const uint8_t   *tx,
-                            size_t           len,
-                            const SPIConfig &config);
+    [[nodiscard]] bool
+    send(ioline_t cs_line, const uint8_t *tx, size_t len, const SPIConfig &config);
 
     /**
      * @brief RX-only transfer (send 0xFF bytes, capture response).
@@ -139,8 +134,7 @@ class SpiBus
      * @param config   SPI configuration for this device.
      * @return true on success, false on timeout / DMA error.
      */
-    [[nodiscard]] bool
-    receive(ioline_t cs_line, uint8_t *rx, size_t len, const SPIConfig &config);
+    [[nodiscard]] bool receive(ioline_t cs_line, uint8_t *rx, size_t len, const SPIConfig &config);
 
     /**
      * @brief Read a single 8-bit register (SPI sensor convention).
@@ -166,10 +160,8 @@ class SpiBus
      * @param config   SPI configuration.
      * @return true on success.
      */
-    [[nodiscard]] bool write_register(ioline_t         cs_line,
-                                      uint8_t          reg,
-                                      uint8_t          value,
-                                      const SPIConfig &config);
+    [[nodiscard]] bool
+    write_register(ioline_t cs_line, uint8_t reg, uint8_t value, const SPIConfig &config);
 
     /**
      * @brief Read a burst of registers starting at `reg`.

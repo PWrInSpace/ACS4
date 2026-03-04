@@ -50,9 +50,8 @@ static const uint8_t vcom_device_descriptor_data[18] = {
                     1)      /* bNumConfigurations          */
 };
 
-static const USBDescriptor vcom_device_descriptor = {
-    sizeof vcom_device_descriptor_data,
-    vcom_device_descriptor_data};
+static const USBDescriptor vcom_device_descriptor = {sizeof vcom_device_descriptor_data,
+                                                     vcom_device_descriptor_data};
 
 /* ── Configuration Descriptor (CDC ACM, 2 interfaces) ────────────────── */
 

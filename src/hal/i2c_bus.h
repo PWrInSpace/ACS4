@@ -74,10 +74,8 @@ class I2cBus
      * @param sda_line PAL line for SDA (needed for bus recovery).
      * @return true on success, false if driver is null.
      */
-    [[nodiscard]] bool init(I2CDriver       *driver,
-                            const I2CConfig &config,
-                            ioline_t         scl_line,
-                            ioline_t         sda_line);
+    [[nodiscard]] bool
+    init(I2CDriver *driver, const I2CConfig &config, ioline_t scl_line, ioline_t sda_line);
 
     /**
      * @brief Write then read from an I2C device (combined transaction).
@@ -92,11 +90,8 @@ class I2cBus
      * @param rx_len  Number of bytes to receive.
      * @return true on success, false on timeout/NACK/bus error.
      */
-    [[nodiscard]] bool write_read(uint8_t        addr,
-                                  const uint8_t *tx,
-                                  size_t         tx_len,
-                                  uint8_t       *rx,
-                                  size_t         rx_len);
+    [[nodiscard]] bool
+    write_read(uint8_t addr, const uint8_t *tx, size_t tx_len, uint8_t *rx, size_t rx_len);
 
     /**
      * @brief Write-only transaction.

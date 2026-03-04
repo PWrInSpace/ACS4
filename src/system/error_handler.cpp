@@ -85,8 +85,7 @@ void error_report(ErrorCode code)
 
     chSysLock();
     s_errors[idx].count++;
-    s_errors[idx].last_ms =
-        static_cast<uint32_t>(chTimeI2MS(chVTGetSystemTimeX()));
+    s_errors[idx].last_ms = static_cast<uint32_t>(chTimeI2MS(chVTGetSystemTimeX()));
     chSysUnlock();
 }
 
@@ -103,9 +102,7 @@ uint32_t error_count(ErrorCode code)
 const char *error_name(ErrorCode code)
 {
     auto idx = static_cast<int>(code);
-    if (idx < 0
-        || idx >= static_cast<int>(sizeof(s_error_names)
-                                   / sizeof(s_error_names[0])))
+    if (idx < 0 || idx >= static_cast<int>(sizeof(s_error_names) / sizeof(s_error_names[0])))
     {
         return "???";
     }
@@ -121,12 +118,7 @@ void error_clear_all()
 
 void error_print(BaseSequentialStream *chp)
 {
-    chprintf(chp,
-             "%-24s %8s %10s %s\r\n",
-             "Error",
-             "Count",
-             "Last(ms)",
-             "Critical");
+    chprintf(chp, "%-24s %8s %10s %s\r\n", "Error", "Count", "Last(ms)", "Critical");
     chprintf(chp, "------------------------------------------------------\r\n");
 
     bool any = false;

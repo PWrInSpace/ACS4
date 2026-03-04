@@ -29,7 +29,6 @@ Checks: "-*,\
   -misc-non-private-member-variables-in-classes,\
   -misc-use-anonymous-namespace,\
   -modernize-avoid-c-arrays,\
-  -modernize-concat-nested-namespaces,\
   -modernize-use-nodiscard,\
   -modernize-use-trailing-return-type,\
   -performance-enum-size,\
@@ -48,6 +47,7 @@ WarningsAsErrors: "\
   bugprone-undefined-memory-manipulation,\
   clang-analyzer-core.*,\
   clang-analyzer-deadcode.*,\
+  bugprone-narrowing-conversions,\
   concurrency-*,\
   misc-no-recursion"
 

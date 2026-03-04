@@ -8,7 +8,8 @@
 #include <algorithm>
 #include <cmath>
 
-namespace acs::nav {
+namespace acs::nav
+{
 
 /* ── Construction ────────────────────────────────────────────────────────── */
 
@@ -19,8 +20,7 @@ Quat quat_from_rotation_vector(const Vec3 &rv)
     {
         /* Small angle: first-order Taylor of exp(rv/2).
          * q ≈ [1, rv/2]  (then normalize to stay on S³). */
-        return Quat(1.0f, rv.x() * 0.5f, rv.y() * 0.5f, rv.z() * 0.5f)
-            .normalized();
+        return Quat(1.0f, rv.x() * 0.5f, rv.y() * 0.5f, rv.z() * 0.5f).normalized();
     }
     const float half_angle = angle * 0.5f;
     const float s          = std::sin(half_angle) / angle; /* sin(θ/2) / θ */
@@ -51,10 +51,10 @@ Quat quat_from_euler(float roll, float pitch, float yaw)
     const float cy = std::cos(yaw * 0.5f);
     const float sy = std::sin(yaw * 0.5f);
 
-    return Quat(cr * cp * cy + sr * sp * sy,   /* w */
-                sr * cp * cy - cr * sp * sy,    /* x */
-                cr * sp * cy + sr * cp * sy,    /* y */
-                cr * cp * sy - sr * sp * cy);   /* z */
+    return Quat(cr * cp * cy + sr * sp * sy,  /* w */
+                sr * cp * cy - cr * sp * sy,  /* x */
+                cr * sp * cy + sr * cp * sy,  /* y */
+                cr * cp * sy - sr * sp * cy); /* z */
 }
 
 /* ── Core operations ─────────────────────────────────────────────────────── */
@@ -71,8 +71,7 @@ Quat quat_normalize(const Quat &q)
 
 /* ── Euler extraction ────────────────────────────────────────────────────── */
 
-void quat_to_euler(const Quat &q, float &roll, float &pitch,
-                   float &yaw)
+void quat_to_euler(const Quat &q, float &roll, float &pitch, float &yaw)
 {
     /*
      * Direct extraction from quaternion components (ZYX convention).
@@ -90,14 +89,12 @@ void quat_to_euler(const Quat &q, float &roll, float &pitch,
     const float z = q.z();
 
     /* sinp = -R(2,0) = 2(qw·qy - qx·qz) */
-    const float sinp = 2.0f * (w * y - x * z);
+    const float sinp         = 2.0f * (w * y - x * z);
     const float sinp_clamped = std::clamp(sinp, -1.0f, 1.0f);
 
-    roll  = std::atan2(2.0f * (y * z + w * x),
-                       w * w - x * x - y * y + z * z);
+    roll  = std::atan2(2.0f * (y * z + w * x), w * w - x * x - y * y + z * z);
     pitch = std::asin(sinp_clamped);
-    yaw   = std::atan2(2.0f * (x * y + w * z),
-                       w * w + x * x - y * y - z * z);
+    yaw   = std::atan2(2.0f * (x * y + w * z), w * w + x * x - y * y - z * z);
 }
 
 /* ── Integration ─────────────────────────────────────────────────────────── */
@@ -115,7 +112,7 @@ float quat_error_angle(const Quat &a, const Quat &b)
 {
     /* θ = 2 · acos(|a · b|) */
     float dot = std::abs(a.coeffs().dot(b.coeffs()));
-    dot = std::min(1.0f, dot); /* clamp for numerical safety */
+    dot       = std::min(1.0f, dot); /* clamp for numerical safety */
     return 2.0f * std::acos(dot);
 }
 

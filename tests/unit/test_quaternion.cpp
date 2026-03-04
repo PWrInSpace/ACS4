@@ -23,7 +23,6 @@ using namespace acs::nav;
 
 static constexpr float PI      = 3.14159265358979323846f;
 static constexpr float DEG2RAD = PI / 180.0f;
-static constexpr float RAD2DEG = 180.0f / PI;
 static constexpr float TOL     = 1e-5f;
 static constexpr float TOL_DEG = 0.1f * DEG2RAD; /* 0.1° in rad */
 
@@ -31,12 +30,10 @@ static constexpr float TOL_DEG = 0.1f * DEG2RAD; /* 0.1° in rad */
 static void EXPECT_QUAT_NEAR(const Quat &a, const Quat &b, float tol = TOL)
 {
     /* q and -q represent the same rotation */
-    float dot = std::fabs(a.w() * b.w() + a.x() * b.x() + a.y() * b.y()
-                          + a.z() * b.z());
-    EXPECT_NEAR(dot, 1.0f, tol)
-        << "Quaternions differ: [" << a.w() << "," << a.x() << "," << a.y()
-        << "," << a.z() << "] vs [" << b.w() << "," << b.x() << "," << b.y()
-        << "," << b.z() << "]";
+    float dot = std::fabs(a.w() * b.w() + a.x() * b.x() + a.y() * b.y() + a.z() * b.z());
+    EXPECT_NEAR(dot, 1.0f, tol) << "Quaternions differ: [" << a.w() << "," << a.x() << "," << a.y()
+                                << "," << a.z() << "] vs [" << b.w() << "," << b.x() << "," << b.y()
+                                << "," << b.z() << "]";
 }
 
 static void EXPECT_VEC3_NEAR(const Vec3 &a, const Vec3 &b, float tol = TOL)

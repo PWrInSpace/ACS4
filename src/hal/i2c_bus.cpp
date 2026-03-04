@@ -18,10 +18,7 @@ namespace acs
 
 /* ── Init ─────────────────────────────────────────────────────────────── */
 
-bool I2cBus::init(I2CDriver       *driver,
-                  const I2CConfig &config,
-                  ioline_t         scl_line,
-                  ioline_t         sda_line)
+bool I2cBus::init(I2CDriver *driver, const I2CConfig &config, ioline_t scl_line, ioline_t sda_line)
 {
     if (driver == nullptr)
     {
@@ -44,11 +41,7 @@ bool I2cBus::init(I2CDriver       *driver,
 
 /* ── Write + Read (combined transaction) ──────────────────────────────── */
 
-bool I2cBus::write_read(uint8_t        addr,
-                        const uint8_t *tx,
-                        size_t         tx_len,
-                        uint8_t       *rx,
-                        size_t         rx_len)
+bool I2cBus::write_read(uint8_t addr, const uint8_t *tx, size_t tx_len, uint8_t *rx, size_t rx_len)
 {
     if (!initialized_)
     {
@@ -56,13 +49,7 @@ bool I2cBus::write_read(uint8_t        addr,
     }
 
     const BusGuard lock(driver_);
-    const msg_t    status = i2cMasterTransmitTimeout(driver_,
-                                                  addr,
-                                                  tx,
-                                                  tx_len,
-                                                  rx,
-                                                  rx_len,
-                                                  kTimeout);
+    const msg_t status = i2cMasterTransmitTimeout(driver_, addr, tx, tx_len, rx, rx_len, kTimeout);
 
     if (status != MSG_OK)
     {
@@ -82,13 +69,7 @@ bool I2cBus::write(uint8_t addr, const uint8_t *tx, size_t tx_len)
     }
 
     const BusGuard lock(driver_);
-    const msg_t    status = i2cMasterTransmitTimeout(driver_,
-                                                  addr,
-                                                  tx,
-                                                  tx_len,
-                                                  nullptr,
-                                                  0,
-                                                  kTimeout);
+    const msg_t status = i2cMasterTransmitTimeout(driver_, addr, tx, tx_len, nullptr, 0, kTimeout);
 
     if (status != MSG_OK)
     {
@@ -108,8 +89,7 @@ bool I2cBus::read(uint8_t addr, uint8_t *rx, size_t rx_len)
     }
 
     const BusGuard lock(driver_);
-    const msg_t    status =
-        i2cMasterReceiveTimeout(driver_, addr, rx, rx_len, kTimeout);
+    const msg_t    status = i2cMasterReceiveTimeout(driver_, addr, rx, rx_len, kTimeout);
 
     if (status != MSG_OK)
     {
@@ -131,13 +111,7 @@ bool I2cBus::probe(uint8_t addr)
     /* Send a zero-byte write; device will ACK if present. */
     const uint8_t  dummy = 0;
     const BusGuard lock(driver_);
-    const msg_t    status = i2cMasterTransmitTimeout(driver_,
-                                                  addr,
-                                                  &dummy,
-                                                  0,
-                                                  nullptr,
-                                                  0,
-                                                  kTimeout);
+    const msg_t status = i2cMasterTransmitTimeout(driver_, addr, &dummy, 0, nullptr, 0, kTimeout);
 
     if (status != MSG_OK)
     {
@@ -214,10 +188,8 @@ bool I2cBus::bus_recovery()
      *   I2C2: PB10/PB11 AF4
      *   (both are AF4 on STM32H7)
      */
-    palSetLineMode(scl_line_,
-                   PAL_MODE_ALTERNATE(4) | PAL_STM32_OTYPE_OPENDRAIN);
-    palSetLineMode(sda_line_,
-                   PAL_MODE_ALTERNATE(4) | PAL_STM32_OTYPE_OPENDRAIN);
+    palSetLineMode(scl_line_, PAL_MODE_ALTERNATE(4) | PAL_STM32_OTYPE_OPENDRAIN);
+    palSetLineMode(sda_line_, PAL_MODE_ALTERNATE(4) | PAL_STM32_OTYPE_OPENDRAIN);
 
     i2cStart(driver_, &config_);
 

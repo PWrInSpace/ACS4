@@ -9,7 +9,6 @@
 #pragma once
 
 #include <cstdint>
-#include <cstring>
 
 extern "C" {
 #include "hal.h"
@@ -127,9 +126,7 @@ inline void profiler_print(BaseSequentialStream *chp)
     {
         auto       &s = profiler_slot(i);
         const float avg_us =
-            (s.count > 0)
-                ? cycles_to_us(static_cast<uint32_t>(s.total_cycles / s.count))
-                : 0.0f;
+            (s.count > 0) ? cycles_to_us(static_cast<uint32_t>(s.total_cycles / s.count)) : 0.0f;
         chprintf(chp,
                  "%-24s %10.1f %10.1f %10.1f %10lu\r\n",
                  s.name,

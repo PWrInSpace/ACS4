@@ -82,10 +82,7 @@ bool SpiBus::transfer(ioline_t         cs_line,
 
 /* ── TX-only ──────────────────────────────────────────────────────────── */
 
-bool SpiBus::send(ioline_t         cs_line,
-                  const uint8_t   *tx,
-                  size_t           len,
-                  const SPIConfig &config)
+bool SpiBus::send(ioline_t cs_line, const uint8_t *tx, size_t len, const SPIConfig &config)
 {
     if (!initialized_ || tx == nullptr || len == 0)
     {
@@ -108,10 +105,7 @@ bool SpiBus::send(ioline_t         cs_line,
 
 /* ── RX-only ──────────────────────────────────────────────────────────── */
 
-bool SpiBus::receive(ioline_t         cs_line,
-                     uint8_t         *rx,
-                     size_t           len,
-                     const SPIConfig &config)
+bool SpiBus::receive(ioline_t cs_line, uint8_t *rx, size_t len, const SPIConfig &config)
 {
     if (!initialized_ || rx == nullptr || len == 0)
     {
@@ -134,8 +128,7 @@ bool SpiBus::receive(ioline_t         cs_line,
 
 /* ── Read single register ─────────────────────────────────────────────── */
 
-std::optional<uint8_t>
-SpiBus::read_register(ioline_t cs_line, uint8_t reg, const SPIConfig &config)
+std::optional<uint8_t> SpiBus::read_register(ioline_t cs_line, uint8_t reg, const SPIConfig &config)
 {
     /*
      * Standard SPI sensor register read:
@@ -158,10 +151,7 @@ SpiBus::read_register(ioline_t cs_line, uint8_t reg, const SPIConfig &config)
 
 /* ── Write single register ────────────────────────────────────────────── */
 
-bool SpiBus::write_register(ioline_t         cs_line,
-                            uint8_t          reg,
-                            uint8_t          value,
-                            const SPIConfig &config)
+bool SpiBus::write_register(ioline_t cs_line, uint8_t reg, uint8_t value, const SPIConfig &config)
 {
     /*
      * Standard SPI sensor register write:

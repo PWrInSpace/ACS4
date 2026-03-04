@@ -8,6 +8,7 @@
 #include "system/debug_shell.h"
 
 #include <cstdlib>
+#include <cstring>
 
 extern "C" {
 #include "ch.h"
@@ -54,12 +55,7 @@ static void cmd_uptime(BaseSequentialStream *chp, int argc, char *argv[])
     const uint32_t s  = ms / 1000;
     const uint32_t m  = s / 60;
     const uint32_t h  = m / 60;
-    chprintf(chp,
-             "Uptime: %lu:%02lu:%02lu (%lu ms)\r\n",
-             h,
-             m % 60,
-             s % 60,
-             ms);
+    chprintf(chp, "Uptime: %lu:%02lu:%02lu (%lu ms)\r\n", h, m % 60, s % 60, ms);
 }
 
 static void cmd_threads(BaseSequentialStream *chp, int argc, char *argv[])
@@ -84,13 +80,7 @@ static void cmd_threads(BaseSequentialStream *chp, int argc, char *argv[])
                                         "WTMSG",
                                         "FINAL"};
 
-    chprintf(chp,
-             "%-16s %4s %6s %10s %s\r\n",
-             "Name",
-             "Prio",
-             "Stack",
-             "FreeStack",
-             "State");
+    chprintf(chp, "%-16s %4s %6s %10s %s\r\n", "Name", "Prio", "Stack", "FreeStack", "State");
     chprintf(chp, "------------------------------------------------------\r\n");
 
     thread_t *tp = chRegFirstThread();
@@ -104,15 +94,13 @@ static void cmd_threads(BaseSequentialStream *chp, int argc, char *argv[])
         {
             begin++;
         }
-        stk_free = static_cast<uint32_t>(
-            begin - reinterpret_cast<uint8_t *>(tp->wabase));
+        stk_free = static_cast<uint32_t>(begin - reinterpret_cast<uint8_t *>(tp->wabase));
 #endif
 
         const char *name = (tp->name != nullptr) ? tp->name : "<unnamed>";
         const auto  idx  = static_cast<unsigned>(tp->state);
-        const char *st   = (idx < sizeof(state_names) / sizeof(state_names[0]))
-                               ? state_names[idx]
-                               : "???";
+        const char *st =
+            (idx < sizeof(state_names) / sizeof(state_names[0])) ? state_names[idx] : "???";
 
         chprintf(chp,
                  "%-16s %4u %6s %10lu %s\r\n",
@@ -237,11 +225,7 @@ static void shell_launch(BaseSequentialStream *stream)
 #endif
     };
 
-    chThdCreateStatic(waShell,
-                      sizeof(waShell),
-                      NORMALPRIO - 10,
-                      shellThread,
-                      &shell_cfg);
+    chThdCreateStatic(waShell, sizeof(waShell), NORMALPRIO - 10, shellThread, &shell_cfg);
 }
 
 void shell_start(SerialDriver *serial_driver, uint32_t baudrate)

@@ -37,13 +37,12 @@ int watchdog_register(const char *name, uint32_t timeout_ms)
     {
         return -1;
     }
-    const int id           = s_slot_count++;
-    s_slots[id].name       = name;
-    s_slots[id].timeout_ms = timeout_ms;
-    s_slots[id].last_feed_ms =
-        static_cast<uint32_t>(chTimeI2MS(chVTGetSystemTimeX()));
-    s_slots[id].active    = true;
-    s_slots[id].timed_out = false;
+    const int id             = s_slot_count++;
+    s_slots[id].name         = name;
+    s_slots[id].timeout_ms   = timeout_ms;
+    s_slots[id].last_feed_ms = static_cast<uint32_t>(chTimeI2MS(chVTGetSystemTimeX()));
+    s_slots[id].active       = true;
+    s_slots[id].timed_out    = false;
     return id;
 }
 
@@ -53,9 +52,8 @@ void watchdog_feed(int slot_id)
     {
         return;
     }
-    s_slots[slot_id].last_feed_ms =
-        static_cast<uint32_t>(chTimeI2MS(chVTGetSystemTimeX()));
-    s_slots[slot_id].timed_out = false;
+    s_slots[slot_id].last_feed_ms = static_cast<uint32_t>(chTimeI2MS(chVTGetSystemTimeX()));
+    s_slots[slot_id].timed_out    = false;
 }
 
 /* ── Monitor thread ───────────────────────────────────────────────────── */
@@ -69,8 +67,7 @@ static THD_FUNCTION(WdgMonitor, arg)
 
     while (true)
     {
-        const auto now_ms =
-            static_cast<uint32_t>(chTimeI2MS(chVTGetSystemTimeX()));
+        const auto now_ms = static_cast<uint32_t>(chTimeI2MS(chVTGetSystemTimeX()));
 
         /* Check each software watchdog slot. */
         for (int i = 0; i < s_slot_count; i++)
@@ -115,11 +112,7 @@ void watchdog_init()
 #endif
 
     /* Start monitor thread at above-normal priority. */
-    chThdCreateStatic(waWdgMonitor,
-                      sizeof(waWdgMonitor),
-                      NORMALPRIO + 20,
-                      WdgMonitor,
-                      nullptr);
+    chThdCreateStatic(waWdgMonitor, sizeof(waWdgMonitor), NORMALPRIO + 20, WdgMonitor, nullptr);
 }
 
 }  // namespace acs

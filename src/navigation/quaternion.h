@@ -16,7 +16,8 @@
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 
-namespace acs::nav {
+namespace acs::nav
+{
 
 /* ── Type aliases ────────────────────────────────────────────────────────── */
 using Quat = Eigen::Quaternionf;
@@ -116,8 +117,7 @@ void quat_to_euler(const Quat &q, float &roll, float &pitch, float &yaw);
  * @param dt    Time step [s].
  * @return      Updated, normalized quaternion.
  */
-[[nodiscard]] Quat quat_integrate(const Quat &q, const Vec3 &omega,
-                                  float dt);
+[[nodiscard]] Quat quat_integrate(const Quat &q, const Vec3 &omega, float dt);
 
 /* ── Error metrics (for attitude control) ────────────────────────────────── */
 
@@ -137,7 +137,6 @@ void quat_to_euler(const Quat &q, float &roll, float &pitch, float &yaw);
  * @param desired  Desired orientation.
  * @return Error rotation vector in body frame [rad].
  */
-[[nodiscard]] Vec3 quat_error_vector(const Quat &current,
-                                     const Quat &desired);
+[[nodiscard]] Vec3 quat_error_vector(const Quat &current, const Quat &desired);
 
 }  // namespace acs::nav

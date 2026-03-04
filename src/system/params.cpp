@@ -46,8 +46,7 @@ static ParamEntry s_params[] = {
 };
 // clang-format on
 
-static constexpr int PARAM_COUNT =
-    static_cast<int>(sizeof(s_params) / sizeof(s_params[0]));
+static constexpr int PARAM_COUNT = static_cast<int>(sizeof(s_params) / sizeof(s_params[0]));
 
 /* ── Find by name ─────────────────────────────────────────────────────── */
 
@@ -105,13 +104,7 @@ void param_reset_all()
 
 void param_list(BaseSequentialStream *chp)
 {
-    chprintf(chp,
-             "%-28s %12s %12s [%8s, %8s]\r\n",
-             "Name",
-             "Value",
-             "Default",
-             "Min",
-             "Max");
+    chprintf(chp, "%-28s %12s %12s [%8s, %8s]\r\n", "Name", "Value", "Default", "Min", "Max");
     chprintf(chp,
              "-----------------------------------------------------------------"
              "---------\r\n");

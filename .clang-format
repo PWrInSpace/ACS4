@@ -13,6 +13,8 @@ IndentPPDirectives: BeforeHash
 IndentExternBlock: NoIndent
 NamespaceIndentation: None
 
+ColumnLimit: 100
+
 PenaltyBreakBeforeFirstCallParameter: 19
 PenaltyBreakComment: 300
 PenaltyBreakFirstLessLess: 120
@@ -94,10 +96,12 @@ IncludeCategories:
     Priority: 2
   - Regex: '^<ch.*\.h>'
     Priority: 3
-  - Regex: '^<.*>'
+  - Regex: '^<Eigen/'
     Priority: 4
-  - Regex: '^".*"'
+  - Regex: '^<.*>'
     Priority: 5
+  - Regex: '^".*"'
+    Priority: 6
 
 MacroBlockBegin: ''
 MacroBlockEnd: ''
