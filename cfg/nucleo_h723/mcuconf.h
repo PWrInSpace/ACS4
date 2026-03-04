@@ -5,7 +5,7 @@
     Clock tree:
       HSE = 8 MHz (from ST-Link MCO, bypass mode)
       PLL1_P = 550 MHz (SYSCLK - max for H723)
-      PLL1_Q = 48 MHz  (USB, SDMMC)
+      PLL1_Q = 50 MHz  (SPI1-3, SDMMC)
       AHB    = 275 MHz (HCLK)
       APB1   = 137.5 MHz
       APB2   = 137.5 MHz
@@ -79,7 +79,7 @@
  *
  * HSE = 8 MHz
  * PLL1: 8 / 4 * 550 / 2 = 550 MHz (sys_ck)
- *       8 / 4 * 550 / 2 = 275 MHz (unused, but PLL1_Q = 8/4*240/10=48 MHz)
+ *       8 / 4 * 275 / 11 = 50 MHz (PLL1_Q → SPI1-3, SDMMC)
  */
 #define STM32_PLLSRC                        STM32_PLLSRC_HSE_CK
 #define STM32_PLLCFGR_MASK                  ~0

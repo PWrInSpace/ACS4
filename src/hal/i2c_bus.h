@@ -18,7 +18,8 @@
  *
  * Usage:
  *   acs::I2cBus i2c;
- *   i2c.init(&I2CD1, acs::I2cBus::default_config());
+ *   i2c.init(&I2CD1, acs::I2cBus::default_config(),
+ *            LINE_I2C1_SCL, LINE_I2C1_SDA);
  *   uint8_t reg = 0x75;
  *   uint8_t buf[6];
  *   i2c.write_read(0x30, &reg, 1, buf, sizeof(buf));
@@ -50,13 +51,15 @@ class I2cBus
      * @brief Default I2C configuration: 400 kHz Fast Mode.
      *
      * TIMINGR value for STM32H7 @ PCLK1 = 137.5 MHz:
-     *   PRESC=0x3, SCLDEL=0x4, SDADEL=0x2, SCLH=0x0F, SCLL=0x13
-     *   → ~400 kHz (datasheet RM0468 §50.4.10)
+     *   PRESC=0x3, SCLDEL=0x4, SDADEL=0x2, SCLH=0x1D, SCLL=0x2F
+     *   t_HIGH ≈ 30 × 29.09 ns + 130 ns ≈ 1003 ns  (spec ≥ 600 ns)
+     *   t_LOW  ≈ 48 × 29.09 ns + 130 ns ≈ 1526 ns  (spec ≥ 1300 ns)
+     *   f_SCL  ≈ 1 / (1003 + 1526) ns    ≈ 395 kHz
      */
     static constexpr I2CConfig default_config()
     {
         return I2CConfig{
-            .timingr = 0x30420F13U, /* 400 kHz Fast Mode @ 137.5 MHz PCLK1 */
+            .timingr = 0x30421D2FU, /* 400 kHz Fast Mode @ 137.5 MHz PCLK1 */
             .cr1     = 0U,
             .cr2     = 0U,
         };
