@@ -8,10 +8,7 @@
 #include <algorithm>
 #include <cmath>
 
-namespace acs
-{
-namespace nav
-{
+namespace acs::nav {
 
 /* ── Construction ────────────────────────────────────────────────────────── */
 
@@ -45,11 +42,19 @@ Quat quat_from_axis_angle(const Vec3 &axis, float angle_rad)
 
 Quat quat_from_euler(float roll, float pitch, float yaw)
 {
-    /* ZYX: R = Rz(ψ) · Ry(θ) · Rx(φ)  →  q = qz ⊗ qy ⊗ qx */
-    const Quat qx(Eigen::AngleAxisf(roll, Vec3::UnitX()));
-    const Quat qy(Eigen::AngleAxisf(pitch, Vec3::UnitY()));
-    const Quat qz(Eigen::AngleAxisf(yaw, Vec3::UnitZ()));
-    return (qz * qy * qx).normalized();
+    /* ZYX: R = Rz(ψ) · Ry(θ) · Rx(φ)  →  q = qz ⊗ qy ⊗ qx
+     * Direct formula avoids constructing 3 intermediate quaternions. */
+    const float cr = std::cos(roll * 0.5f);
+    const float sr = std::sin(roll * 0.5f);
+    const float cp = std::cos(pitch * 0.5f);
+    const float sp = std::sin(pitch * 0.5f);
+    const float cy = std::cos(yaw * 0.5f);
+    const float sy = std::sin(yaw * 0.5f);
+
+    return Quat(cr * cp * cy + sr * sp * sy,   /* w */
+                sr * cp * cy - cr * sp * sy,    /* x */
+                cr * sp * cy + sr * cp * sy,    /* y */
+                cr * cp * sy - sr * sp * cy);   /* z */
 }
 
 /* ── Core operations ─────────────────────────────────────────────────────── */
@@ -66,23 +71,33 @@ Quat quat_normalize(const Quat &q)
 
 /* ── Euler extraction ────────────────────────────────────────────────────── */
 
-void quat_to_euler(const Quat &q, float &roll, float &pitch, float &yaw)
+void quat_to_euler(const Quat &q, float &roll, float &pitch,
+                   float &yaw)
 {
     /*
-     * From DCM (ZYX convention):
-     *   roll  = atan2(R(2,1), R(2,2))
-     *   pitch = -asin(R(2,0))
-     *   yaw   = atan2(R(1,0), R(0,0))
+     * Direct extraction from quaternion components (ZYX convention).
+     * Avoids computing the full 3×3 DCM — only the 5 needed elements.
+     *
+     *   R(2,0) = 2(qx·qz - qw·qy)
+     *   R(2,1) = 2(qy·qz + qw·qx)
+     *   R(2,2) = qw² - qx² - qy² + qz²
+     *   R(1,0) = 2(qx·qy + qw·qz)
+     *   R(0,0) = qw² + qx² - qy² - qz²
      */
-    const Mat3 R = q.toRotationMatrix();
+    const float w = q.w();
+    const float x = q.x();
+    const float y = q.y();
+    const float z = q.z();
 
-    const float sinp = -R(2, 0);
-    /* Clamp for numerical safety near ±90° pitch (gimbal lock region). */
+    /* sinp = -R(2,0) = 2(qw·qy - qx·qz) */
+    const float sinp = 2.0f * (w * y - x * z);
     const float sinp_clamped = std::clamp(sinp, -1.0f, 1.0f);
 
-    roll  = std::atan2(R(2, 1), R(2, 2));
+    roll  = std::atan2(2.0f * (y * z + w * x),
+                       w * w - x * x - y * y + z * z);
     pitch = std::asin(sinp_clamped);
-    yaw   = std::atan2(R(1, 0), R(0, 0));
+    yaw   = std::atan2(2.0f * (x * y + w * z),
+                       w * w + x * x - y * y - z * z);
 }
 
 /* ── Integration ─────────────────────────────────────────────────────────── */
@@ -98,10 +113,8 @@ Quat quat_integrate(const Quat &q, const Vec3 &omega, float dt)
 
 float quat_error_angle(const Quat &a, const Quat &b)
 {
-    /* θ = 2 · acos(|a · b|)
-     * Dot product of quaternion coefficients. */
-    float dot =
-        std::abs(a.w() * b.w() + a.x() * b.x() + a.y() * b.y() + a.z() * b.z());
+    /* θ = 2 · acos(|a · b|) */
+    float dot = std::abs(a.coeffs().dot(b.coeffs()));
     dot = std::min(1.0f, dot); /* clamp for numerical safety */
     return 2.0f * std::acos(dot);
 }
@@ -120,5 +133,4 @@ Vec3 quat_error_vector(const Quat &current, const Quat &desired)
     return 2.0f * q_err.vec();
 }
 
-}  // namespace nav
-}  // namespace acs
+}  // namespace acs::nav

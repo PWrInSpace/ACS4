@@ -16,10 +16,7 @@
 #include <Eigen/Core>
 #include <Eigen/Geometry>
 
-namespace acs
-{
-namespace nav
-{
+namespace acs::nav {
 
 /* ── Type aliases ────────────────────────────────────────────────────────── */
 using Quat = Eigen::Quaternionf;
@@ -29,7 +26,7 @@ using Mat3 = Eigen::Matrix3f;
 /* ── Construction ────────────────────────────────────────────────────────── */
 
 /** @brief Identity quaternion (no rotation). */
-inline Quat quat_identity()
+[[nodiscard]] inline Quat quat_identity()
 {
     return Quat::Identity();
 }
@@ -39,14 +36,14 @@ inline Quat quat_identity()
  * @param rv  Rotation vector [rad]. Direction = axis, magnitude = angle.
  * @return Unit quaternion representing the rotation.
  */
-Quat quat_from_rotation_vector(const Vec3 &rv);
+[[nodiscard]] Quat quat_from_rotation_vector(const Vec3 &rv);
 
 /**
  * @brief Create quaternion from axis-angle representation.
  * @param axis      Rotation axis (will be normalized internally).
  * @param angle_rad Rotation angle [rad].
  */
-Quat quat_from_axis_angle(const Vec3 &axis, float angle_rad);
+[[nodiscard]] Quat quat_from_axis_angle(const Vec3 &axis, float angle_rad);
 
 /**
  * @brief Create quaternion from ZYX Euler angles.
@@ -54,21 +51,21 @@ Quat quat_from_axis_angle(const Vec3 &axis, float angle_rad);
  * @param pitch θ — rotation about Y (right)    [rad]
  * @param yaw   ψ — rotation about Z (down)     [rad]
  */
-Quat quat_from_euler(float roll, float pitch, float yaw);
+[[nodiscard]] Quat quat_from_euler(float roll, float pitch, float yaw);
 
 /* ── Core operations ─────────────────────────────────────────────────────── */
 
 /** @brief Normalize quaternion to unit length. Returns identity on NaN. */
-Quat quat_normalize(const Quat &q);
+[[nodiscard]] Quat quat_normalize(const Quat &q);
 
 /** @brief Quaternion conjugate (= inverse for unit quaternions). */
-inline Quat quat_conjugate(const Quat &q)
+[[nodiscard]] inline Quat quat_conjugate(const Quat &q)
 {
     return q.conjugate();
 }
 
 /** @brief Hamilton product: result = a * b. */
-inline Quat quat_multiply(const Quat &a, const Quat &b)
+[[nodiscard]] inline Quat quat_multiply(const Quat &a, const Quat &b)
 {
     return a * b;
 }
@@ -79,7 +76,7 @@ inline Quat quat_multiply(const Quat &a, const Quat &b)
  * @param v  Vector in body frame.
  * @return   Vector in NED frame.
  */
-inline Vec3 quat_rotate_vector(const Quat &q, const Vec3 &v)
+[[nodiscard]] inline Vec3 quat_rotate_vector(const Quat &q, const Vec3 &v)
 {
     return q * v;
 }
@@ -89,7 +86,7 @@ inline Vec3 quat_rotate_vector(const Quat &q, const Vec3 &v)
  * @param q  Unit quaternion (body -> NED).
  * @return   3×3 rotation matrix.
  */
-inline Mat3 quat_to_dcm(const Quat &q)
+[[nodiscard]] inline Mat3 quat_to_dcm(const Quat &q)
 {
     return q.toRotationMatrix();
 }
@@ -119,7 +116,8 @@ void quat_to_euler(const Quat &q, float &roll, float &pitch, float &yaw);
  * @param dt    Time step [s].
  * @return      Updated, normalized quaternion.
  */
-Quat quat_integrate(const Quat &q, const Vec3 &omega, float dt);
+[[nodiscard]] Quat quat_integrate(const Quat &q, const Vec3 &omega,
+                                  float dt);
 
 /* ── Error metrics (for attitude control) ────────────────────────────────── */
 
@@ -127,7 +125,7 @@ Quat quat_integrate(const Quat &q, const Vec3 &omega, float dt);
  * @brief Geodesic angle between two orientations.
  * @return Angle in [0, π] [rad].
  */
-float quat_error_angle(const Quat &a, const Quat &b);
+[[nodiscard]] float quat_error_angle(const Quat &a, const Quat &b);
 
 /**
  * @brief Rotation error vector from current to desired orientation.
@@ -139,7 +137,7 @@ float quat_error_angle(const Quat &a, const Quat &b);
  * @param desired  Desired orientation.
  * @return Error rotation vector in body frame [rad].
  */
-Vec3 quat_error_vector(const Quat &current, const Quat &desired);
+[[nodiscard]] Vec3 quat_error_vector(const Quat &current,
+                                     const Quat &desired);
 
-}  // namespace nav
-}  // namespace acs
+}  // namespace acs::nav
