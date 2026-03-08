@@ -322,6 +322,11 @@ bool Iim42653::configure(const Iim42653Config &cfg)
         return false;
     }
 
+    if (!configure_notch_filter(cfg))
+    {
+        return false;
+    }
+
     if (!configure_fifo(cfg))
     {
         return false;
@@ -370,7 +375,7 @@ bool Iim42653::configure_odr_fsr(const Iim42653Config &cfg)
 
 bool Iim42653::configure_ui_filters(const Iim42653Config &cfg)
 {
-    /* GYRO_CONFIG1: [3:2] = GYRO_UI_FILT_ORD. */
+    /* GYRO_CONFIG1: [7:5] = TEMP_FILT_BW, [3:2] = GYRO_UI_FILT_ORD. */
     auto gyro_cfg1 = read_reg(GYRO_CONFIG1);
     if (!gyro_cfg1.has_value())
     {
@@ -379,7 +384,9 @@ bool Iim42653::configure_ui_filters(const Iim42653Config &cfg)
     }
 
     const uint8_t gyro_val =
-        (gyro_cfg1.value() & 0xF3) | (static_cast<uint8_t>(cfg.gyro_filter_order) << 2);
+        (gyro_cfg1.value() & 0x03)
+        | (static_cast<uint8_t>(cfg.temp_filter_bw) << 5)
+        | (static_cast<uint8_t>(cfg.gyro_filter_order) << 2);
     if (!write_reg(GYRO_CONFIG1, gyro_val))
     {
         report_error();
@@ -485,6 +492,131 @@ bool Iim42653::configure_aaf(const Iim42653Config &cfg)
             report_error();
             return false;
         }
+    }
+
+    return true;
+}
+
+bool Iim42653::configure_notch_filter(const Iim42653Config &cfg)
+{
+    if (!cfg.gyro_notch.is_enabled())
+    {
+        /* Ensure notch filter is disabled (set GYRO_NF_DIS = bit 0). */
+        auto gs2 = read_bank_reg(1, GYRO_CONFIG_STATIC2);
+        if (!gs2.has_value())
+        {
+            report_error();
+            return false;
+        }
+
+        if (!write_bank_reg(1, GYRO_CONFIG_STATIC2, gs2.value() | 0x01))
+        {
+            report_error();
+            return false;
+        }
+
+        return true;
+    }
+
+    /*
+     * Compute NF_COSWZ and NF_COSWZ_SEL per datasheet §5.2.1.
+     * fdesired is in Hz, formula uses kHz: cos(2π·f_kHz/8).
+     */
+    const float f_khz = cfg.gyro_notch.freq_hz / 1000.0f;
+    const float coswz = std::cos(2.0f * 3.14159265358979f * f_khz / 8.0f);
+
+    uint8_t nf_coswz_sel;
+    int16_t nf_coswz_raw;
+
+    if (std::fabs(coswz) <= 0.875f)
+    {
+        nf_coswz_sel = 0;
+        nf_coswz_raw = static_cast<int16_t>(std::lround(coswz * 256.0f));
+    }
+    else
+    {
+        nf_coswz_sel = 1;
+        if (coswz > 0.875f)
+        {
+            nf_coswz_raw = static_cast<int16_t>(std::lround(8.0f * (1.0f - coswz) * 256.0f));
+        }
+        else
+        {
+            nf_coswz_raw = static_cast<int16_t>(std::lround(-8.0f * (1.0f + coswz) * 256.0f));
+        }
+    }
+
+    /* Encode as unsigned 9-bit value for register packing. */
+    const auto coswz_u9 = static_cast<uint16_t>(nf_coswz_raw & 0x01FF);
+    const uint8_t coswz_low = static_cast<uint8_t>(coswz_u9 & 0xFF);
+    const uint8_t coswz_hi  = static_cast<uint8_t>((coswz_u9 >> 8) & 0x01);
+
+    /* Program same frequency for all 3 axes. */
+    if (!write_bank_reg(1, GYRO_CONFIG_STATIC6, coswz_low))
+    {
+        report_error();
+        return false;
+    }
+
+    if (!write_bank_reg(1, GYRO_CONFIG_STATIC7, coswz_low))
+    {
+        report_error();
+        return false;
+    }
+
+    if (!write_bank_reg(1, GYRO_CONFIG_STATIC8, coswz_low))
+    {
+        report_error();
+        return false;
+    }
+
+    /*
+     * GYRO_CONFIG_STATIC9 (0x12):
+     *   bit 0 = X NF_COSWZ[8]
+     *   bit 1 = Y NF_COSWZ[8]
+     *   bit 2 = Z NF_COSWZ[8]
+     *   bit 3 = X NF_COSWZ_SEL
+     *   bit 4 = Y NF_COSWZ_SEL
+     *   bit 5 = Z NF_COSWZ_SEL
+     */
+    const uint8_t static9 =
+        (coswz_hi << 0) | (coswz_hi << 1) | (coswz_hi << 2)
+        | (nf_coswz_sel << 3) | (nf_coswz_sel << 4) | (nf_coswz_sel << 5);
+
+    if (!write_bank_reg(1, GYRO_CONFIG_STATIC9, static9))
+    {
+        report_error();
+        return false;
+    }
+
+    /* GYRO_CONFIG_STATIC10 (0x13): [6:4] = NF_BW_SEL. */
+    auto gs10 = read_bank_reg(1, GYRO_CONFIG_STATIC10);
+    if (!gs10.has_value())
+    {
+        report_error();
+        return false;
+    }
+
+    const uint8_t bw_val =
+        (gs10.value() & 0x8F) | (static_cast<uint8_t>(cfg.gyro_notch.bw) << 4);
+    if (!write_bank_reg(1, GYRO_CONFIG_STATIC10, bw_val))
+    {
+        report_error();
+        return false;
+    }
+
+    /* Enable notch filter: clear GYRO_NF_DIS (bit 0) in GYRO_CONFIG_STATIC2. */
+    auto gs2 = read_bank_reg(1, GYRO_CONFIG_STATIC2);
+    if (!gs2.has_value())
+    {
+        report_error();
+        return false;
+    }
+
+    if (!write_bank_reg(1, GYRO_CONFIG_STATIC2, gs2.value() & ~0x01U))
+    {
+        report_error();
+        return false;
     }
 
     return true;
@@ -942,6 +1074,74 @@ bool Iim42653::flush_fifo()
     {
         report_error();
         return false;
+    }
+
+    return true;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Hardware Offset Calibration
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+bool Iim42653::set_offsets(const float gyro_bias_dps[3], const float accel_bias_g[3])
+{
+    if (!initialized_)
+    {
+        return false;
+    }
+
+    /*
+     * Gyro offset: 12-bit signed, resolution = 1/32 dps → LSB = raw * 32.
+     * Accel offset: 12-bit signed, resolution = 0.5 mg → LSB = raw * 2000.
+     *
+     * Register layout (Bank 4):
+     *   USER0 = gyro_x[7:0]
+     *   USER1 = gyro_y_hi[7:4] | gyro_x_hi[3:0]
+     *   USER2 = gyro_y[7:0]
+     *   USER3 = gyro_z[7:0]
+     *   USER4 = accel_x_hi[7:4] | gyro_z_hi[3:0]
+     *   USER5 = accel_x[7:0]
+     *   USER6 = accel_y[7:0]
+     *   USER7 = accel_z_hi[7:4] | accel_y_hi[3:0]
+     *   USER8 = accel_z[7:0]
+     */
+    auto to_gyro_lsb = [](float dps) -> int16_t {
+        float clamped = (dps < -64.0f) ? -64.0f : (dps > 64.0f) ? 64.0f : dps;
+        return static_cast<int16_t>(std::lround(clamped * 32.0f));
+    };
+
+    auto to_accel_lsb = [](float g) -> int16_t {
+        float clamped = (g < -1.0f) ? -1.0f : (g > 1.0f) ? 1.0f : g;
+        return static_cast<int16_t>(std::lround(clamped * 2000.0f));
+    };
+
+    const int16_t gx = to_gyro_lsb(gyro_bias_dps[0]);
+    const int16_t gy = to_gyro_lsb(gyro_bias_dps[1]);
+    const int16_t gz = to_gyro_lsb(gyro_bias_dps[2]);
+    const int16_t ax = to_accel_lsb(accel_bias_g[0]);
+    const int16_t ay = to_accel_lsb(accel_bias_g[1]);
+    const int16_t az = to_accel_lsb(accel_bias_g[2]);
+
+    /* Pack into 9 register bytes. Each 12-bit value splits across two regs. */
+    const uint8_t regs[9] = {
+        static_cast<uint8_t>(gx & 0xFF),                                              /* USER0 */
+        static_cast<uint8_t>(((gy & 0x0F00) >> 4) | ((gx >> 8) & 0x0F)),              /* USER1 */
+        static_cast<uint8_t>(gy & 0xFF),                                              /* USER2 */
+        static_cast<uint8_t>(gz & 0xFF),                                              /* USER3 */
+        static_cast<uint8_t>(((ax & 0x0F00) >> 4) | ((gz >> 8) & 0x0F)),              /* USER4 */
+        static_cast<uint8_t>(ax & 0xFF),                                              /* USER5 */
+        static_cast<uint8_t>(ay & 0xFF),                                              /* USER6 */
+        static_cast<uint8_t>(((az & 0x0F00) >> 4) | ((ay >> 8) & 0x0F)),              /* USER7 */
+        static_cast<uint8_t>(az & 0xFF),                                              /* USER8 */
+    };
+
+    for (uint8_t i = 0; i < 9; ++i)
+    {
+        if (!write_bank_reg(4, OFFSET_USER0 + i, regs[i]))
+        {
+            report_error();
+            return false;
+        }
     }
 
     return true;

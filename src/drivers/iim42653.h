@@ -104,11 +104,16 @@ inline constexpr uint8_t REG_BANK_SEL       = 0x76;
 /* ── Bank 1 ────────────────────────────────────────────────────────────── */
 
 inline constexpr uint8_t SENSOR_CONFIG0      = 0x03; /* Bank 1 */
-inline constexpr uint8_t GYRO_CONFIG_STATIC2 = 0x0B; /* Bank 1 */
-inline constexpr uint8_t GYRO_CONFIG_STATIC3 = 0x0C; /* Bank 1 */
-inline constexpr uint8_t GYRO_CONFIG_STATIC4 = 0x0D; /* Bank 1 */
-inline constexpr uint8_t GYRO_CONFIG_STATIC5 = 0x0E; /* Bank 1 */
-inline constexpr uint8_t XG_ST_DATA          = 0x5F; /* Bank 1 */
+inline constexpr uint8_t GYRO_CONFIG_STATIC2  = 0x0B; /* Bank 1 */
+inline constexpr uint8_t GYRO_CONFIG_STATIC3  = 0x0C; /* Bank 1 */
+inline constexpr uint8_t GYRO_CONFIG_STATIC4  = 0x0D; /* Bank 1 */
+inline constexpr uint8_t GYRO_CONFIG_STATIC5  = 0x0E; /* Bank 1 */
+inline constexpr uint8_t GYRO_CONFIG_STATIC6  = 0x0F; /* Bank 1 — X NF_COSWZ[7:0] */
+inline constexpr uint8_t GYRO_CONFIG_STATIC7  = 0x10; /* Bank 1 — Y NF_COSWZ[7:0] */
+inline constexpr uint8_t GYRO_CONFIG_STATIC8  = 0x11; /* Bank 1 — Z NF_COSWZ[7:0] */
+inline constexpr uint8_t GYRO_CONFIG_STATIC9  = 0x12; /* Bank 1 — NF_COSWZ[8] + SEL */
+inline constexpr uint8_t GYRO_CONFIG_STATIC10 = 0x13; /* Bank 1 — NF_BW_SEL [6:4] */
+inline constexpr uint8_t XG_ST_DATA           = 0x5F; /* Bank 1 */
 inline constexpr uint8_t YG_ST_DATA          = 0x60; /* Bank 1 */
 inline constexpr uint8_t ZG_ST_DATA          = 0x61; /* Bank 1 */
 inline constexpr uint8_t INTF_CONFIG4        = 0x7A; /* Bank 1 */
@@ -126,7 +131,15 @@ inline constexpr uint8_t ZA_ST_DATA           = 0x3D; /* Bank 2 */
 
 /* ── Bank 4 ────────────────────────────────────────────────────────────── */
 
-inline constexpr uint8_t OFFSET_USER0 = 0x77; /* Bank 4 */
+inline constexpr uint8_t OFFSET_USER0 = 0x77; /* Bank 4 — gyro X low[7:0] */
+inline constexpr uint8_t OFFSET_USER1 = 0x78; /* Bank 4 — gyro X hi[3:0] | gyro Y hi[7:4] */
+inline constexpr uint8_t OFFSET_USER2 = 0x79; /* Bank 4 — gyro Y low[7:0] */
+inline constexpr uint8_t OFFSET_USER3 = 0x7A; /* Bank 4 — gyro Z low[7:0] */
+inline constexpr uint8_t OFFSET_USER4 = 0x7B; /* Bank 4 — gyro Z hi[3:0] | accel X hi[7:4] */
+inline constexpr uint8_t OFFSET_USER5 = 0x7C; /* Bank 4 — accel X low[7:0] */
+inline constexpr uint8_t OFFSET_USER6 = 0x7D; /* Bank 4 — accel Y low[7:0] */
+inline constexpr uint8_t OFFSET_USER7 = 0x7E; /* Bank 4 — accel Y hi[3:0] | accel Z hi[7:4] */
+inline constexpr uint8_t OFFSET_USER8 = 0x7F; /* Bank 4 — accel Z low[7:0] */
 
 /* ── Constants ─────────────────────────────────────────────────────────── */
 
@@ -215,6 +228,31 @@ enum class FilterBw : uint8_t
     ODR_DIV_40 = 7,
 };
 
+/** Temperature sensor filter bandwidth. Bits [7:5] of GYRO_CONFIG1. */
+enum class TempFilterBw : uint8_t
+{
+    HZ_4000 = 0, /* default — not recommended (noisy) */
+    HZ_170  = 1,
+    HZ_82   = 2,
+    HZ_40   = 3, /* recommended for flight */
+    HZ_20   = 4,
+    HZ_10   = 5,
+    HZ_5    = 6,
+};
+
+/** Gyro notch filter bandwidth. Bits [6:4] of GYRO_CONFIG_STATIC10 (Bank 1, 0x13h). */
+enum class NotchBw : uint8_t
+{
+    HZ_1449 = 0,
+    HZ_680  = 1,
+    HZ_329  = 2,
+    HZ_162  = 3,
+    HZ_80   = 4,
+    HZ_40   = 5,
+    HZ_20   = 6,
+    HZ_10   = 7,
+};
+
 /**
  * Anti-Alias Filter bandwidth preset.
  *
@@ -265,31 +303,51 @@ struct AafBw
     }
 };
 
+/**
+ * Gyro notch filter configuration.
+ *
+ * Suppresses MEMS sense resonance noise (1–3 kHz) per axis.
+ * Set freq_hz = 0 to disable (default).
+ */
+struct GyroNotchConfig
+{
+    float   freq_hz = 0.0f; /* Notch frequency in Hz (1000–3000), 0 = disabled */
+    NotchBw bw      = NotchBw::HZ_329; /* Notch bandwidth */
+
+    bool is_enabled() const { return freq_hz >= 1000.0f && freq_hz <= 3000.0f; }
+
+    static constexpr GyroNotchConfig disabled() { return {0.0f, NotchBw::HZ_329}; }
+};
+
 /* ═══════════════════════════════════════════════════════════════════════════
  * Driver Configuration
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 struct Iim42653Config
 {
-    GyroFsr     gyro_fsr;
-    GyroOdr     gyro_odr;
-    AccelFsr    accel_fsr;
-    AccelOdr    accel_odr;
-    FilterOrder gyro_filter_order;
-    FilterOrder accel_filter_order;
-    FilterBw    gyro_filter_bw;
-    FilterBw    accel_filter_bw;
-    AafBw       gyro_aaf;
-    AafBw       accel_aaf;
-    bool        enable_drdy_int1;
-    bool        enable_fifo;        /* FIFO mode with sensor-side timestamps */
-    uint16_t    fifo_watermark;     /* watermark in packets (1–130, default 1) */
+    GyroFsr      gyro_fsr;
+    GyroOdr      gyro_odr;
+    AccelFsr     accel_fsr;
+    AccelOdr     accel_odr;
+    FilterOrder  gyro_filter_order;
+    FilterOrder  accel_filter_order;
+    FilterBw     gyro_filter_bw;
+    FilterBw     accel_filter_bw;
+    TempFilterBw temp_filter_bw;
+    AafBw        gyro_aaf;
+    AafBw        accel_aaf;
+    GyroNotchConfig gyro_notch;
+    bool         enable_drdy_int1;
+    bool         enable_fifo;        /* FIFO mode with sensor-side timestamps */
+    uint16_t     fifo_watermark;     /* watermark in packets (1–130, default 1) */
 
     /**
      * @brief Default configuration for rocket flight (register-read mode):
      *   - Gyro:  ±2000 dps @ 1 kHz, 2nd-order filter BW = ODR/4
      *   - Accel: ±32 g    @ 1 kHz, 2nd-order filter BW = ODR/4
      *   - AAF:   ~536 Hz on both (rejects motor vibration aliasing)
+     *   - Notch: enabled at MEMS resonance (~2.5 kHz), BW = 329 Hz
+     *   - Temp filter: 40 Hz (low noise for slow-varying temperature)
      *   - DRDY interrupt on INT1, push-pull, active-high
      */
     static constexpr Iim42653Config rocket_default()
@@ -303,8 +361,10 @@ struct Iim42653Config
             .accel_filter_order = FilterOrder::SECOND,
             .gyro_filter_bw     = FilterBw::ODR_DIV_4,
             .accel_filter_bw    = FilterBw::ODR_DIV_4,
+            .temp_filter_bw     = TempFilterBw::HZ_40,
             .gyro_aaf           = AafBw::bw_536(),
             .accel_aaf          = AafBw::bw_536(),
+            .gyro_notch         = {2500.0f, NotchBw::HZ_329},
             .enable_drdy_int1   = true,
             .enable_fifo        = false,
             .fifo_watermark     = 1,
@@ -317,6 +377,10 @@ struct Iim42653Config
      * Same filtering as rocket_default() but uses FIFO Packet 3
      * (accel + gyro + 8-bit temp + 16-bit ODR timestamp, 16 bytes).
      * INT1 fires on FIFO watermark threshold instead of DRDY.
+     *
+     * Watermark = 1 keeps latency identical to DRDY mode while
+     * providing sensor-side timestamps. For lower CPU usage at the
+     * cost of added latency, increase watermark (e.g. 5–10).
      */
     static constexpr Iim42653Config rocket_fifo()
     {
@@ -329,8 +393,10 @@ struct Iim42653Config
             .accel_filter_order = FilterOrder::SECOND,
             .gyro_filter_bw     = FilterBw::ODR_DIV_4,
             .accel_filter_bw    = FilterBw::ODR_DIV_4,
+            .temp_filter_bw     = TempFilterBw::HZ_40,
             .gyro_aaf           = AafBw::bw_536(),
             .accel_aaf          = AafBw::bw_536(),
+            .gyro_notch         = {2500.0f, NotchBw::HZ_329},
             .enable_drdy_int1   = true,
             .enable_fifo        = true,
             .fifo_watermark     = 1,
@@ -436,6 +502,19 @@ class Iim42653
     [[nodiscard]] bool data_ready();
 
     /**
+     * @brief Program hardware offset registers (Bank 4, OFFSET_USER0–8).
+     *
+     * Offsets are applied in hardware before data reaches FIFO/registers,
+     * providing zero-CPU-cost bias correction from the first sample.
+     *
+     * @param gyro_bias_dps   Gyro bias per axis in °/s (±64 dps max, 1/32 dps resolution).
+     * @param accel_bias_g    Accel bias per axis in g (±1 g max, 0.5 mg resolution).
+     * @return true on success.
+     * @pre Sensors must be OFF (call before configure(), or disable sensors first).
+     */
+    [[nodiscard]] bool set_offsets(const float gyro_bias_dps[3], const float accel_bias_g[3]);
+
+    /**
      * @brief Check if the driver has been successfully initialized.
      */
     [[nodiscard]] bool is_initialized() const
@@ -481,6 +560,7 @@ class Iim42653
     [[nodiscard]] bool configure_odr_fsr(const Iim42653Config &cfg);
     [[nodiscard]] bool configure_ui_filters(const Iim42653Config &cfg);
     [[nodiscard]] bool configure_aaf(const Iim42653Config &cfg);
+    [[nodiscard]] bool configure_notch_filter(const Iim42653Config &cfg);
     [[nodiscard]] bool configure_interrupts(const Iim42653Config &cfg);
     [[nodiscard]] bool configure_fifo(const Iim42653Config &cfg);
 
