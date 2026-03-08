@@ -547,6 +547,13 @@ class Iim42653
     /** Read a register from a non-zero bank, then return to bank 0. */
     [[nodiscard]] std::optional<uint8_t> read_bank_reg(uint8_t bank, uint8_t reg);
 
+    /** Read-modify-write: reg = (reg & ~clear_mask) | set_mask. */
+    [[nodiscard]] bool modify_reg(uint8_t reg, uint8_t clear_mask, uint8_t set_mask);
+
+    /** Read-modify-write on a non-zero bank register, then return to bank 0. */
+    [[nodiscard]] bool modify_bank_reg(uint8_t bank, uint8_t reg,
+                                       uint8_t clear_mask, uint8_t set_mask);
+
     /* ── Scale factor computation ────────────────────────────────────── */
 
     void compute_scale_factors();
@@ -566,13 +573,18 @@ class Iim42653
 
     /* ── FIFO helpers ────────────────────────────────────────────────── */
 
-    [[nodiscard]] bool    read_fifo_packet(uint8_t *buf);
     [[nodiscard]] int16_t fifo_byte_count();
-    bool                  parse_fifo_packet(const uint8_t *pkt, ImuSample &sample) const;
+    [[nodiscard]] bool    parse_fifo_packet(const uint8_t *pkt, ImuSample &sample) const;
+
+    /* ── Conversion helpers ───────────────────────────────────────────── */
+
+    void        convert_inertial(const int16_t accel[3], const int16_t gyro[3],
+                                 ImuSample &sample) const;
+    static bool has_invalid(const int16_t data[3]);
 
     /* ── Self-test helpers ───────────────────────────────────────────── */
 
-    bool               read_raw(int16_t accel[3], int16_t gyro[3]);
+    [[nodiscard]] bool read_raw(int16_t accel[3], int16_t gyro[3]);
     [[nodiscard]] bool setup_self_test_mode();
     [[nodiscard]] bool collect_st_samples(int32_t accel_sum[3], int32_t gyro_sum[3], int count);
     [[nodiscard]] bool read_st_factory_refs(float gyro_ref[3], float accel_ref[3]);
@@ -585,23 +597,9 @@ class Iim42653
 
     void report_error();
 
-    /* ── State ───────────────────────────────────────────────────────── */
-
-    SpiBus          *spi_          = nullptr;
-    ioline_t         cs_line_      = 0;
-    const SPIConfig *spi_cfg_      = nullptr;
-    Iim42653Config   config_       = {};
-    uint8_t          current_bank_ = 0;
-    bool             initialized_  = false;
-    bool             fifo_enabled_ = false;
-    uint32_t         error_count_  = 0;
-
-    /* Scale factors: raw * scale = SI unit */
-    float accel_scale_ = 0.0f; /* LSB -> m/s² */
-    float gyro_scale_  = 0.0f; /* LSB -> rad/s */
-
     /* ── Constants ───────────────────────────────────────────────────── */
 
+    static constexpr float kPi         = 3.14159265358979323846f;
     static constexpr float kGravity    = 9.80665f;
     static constexpr float kDeg2Rad    = 0.017453292519943295f; /* π/180 */
     static constexpr float kTempScale  = 1.0f / 132.48f;
@@ -615,6 +613,26 @@ class Iim42653
 
     /** Max FIFO capacity: 2080 / 16 = 130 packets */
     static constexpr size_t kFifoMaxPackets = 130;
+
+    /* ── State ───────────────────────────────────────────────────────── */
+
+    SpiBus          *spi_          = nullptr;
+    ioline_t         cs_line_      = 0;
+    const SPIConfig *spi_cfg_      = nullptr;
+    Iim42653Config   config_       = {};
+    uint8_t          current_bank_ = 0;
+    bool             initialized_  = false;
+    bool             fifo_enabled_ = false;
+    uint32_t         error_count_  = 0;
+
+    /* FIFO bulk-read buffer — lives in BSS instead of stack to avoid
+     * blowing the RTOS thread stack (2080 B). */
+    uint8_t  fifo_bulk_buf_[kFifoMaxPackets * kFifoPacketSize] {};
+    uint16_t raw_sensor_ts_[kFifoMaxPackets] {};
+
+    /* Scale factors: raw * scale = SI unit */
+    float accel_scale_ = 0.0f; /* LSB -> m/s² */
+    float gyro_scale_  = 0.0f; /* LSB -> rad/s */
 
     /** FIFO header bit: FIFO is empty. */
     static constexpr uint8_t kFifoHeaderEmpty = 0x80;

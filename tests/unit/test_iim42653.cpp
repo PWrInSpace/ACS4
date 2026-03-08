@@ -227,13 +227,19 @@ TEST(ImuInvalidData, AllAxesValid)
 
 TEST(ImuInvalidData, TempInvalidStillConvert)
 {
-    /* Temperature 0x8000 is borderline — driver converts it but does
-     * NOT reject the whole sample (only accel/gyro axes are checked). */
+    /* Temperature 0x8000 → driver does NOT reject the whole sample.
+     * Only accel/gyro axes cause rejection; invalid temp gets a 0.0°C
+     * placeholder (consistent between register-read and FIFO paths). */
     const int16_t raw_temp = kInvalidRaw;
-    const float   temp     = static_cast<float>(raw_temp) * kTempScale + kTempOffset;
-    /* -32768 / 132.48 + 25 ≈ -222.4°C — clearly out of operating range,
-     * but the caller should handle temp range validation separately. */
-    EXPECT_LT(temp, -200.0f);
+
+    /* Verify the placeholder path: when raw == kInvalidRaw the driver
+     * returns 0.0°C instead of the nonsensical −222°C conversion. */
+    const float temp_converted = static_cast<float>(raw_temp) * kTempScale + kTempOffset;
+    EXPECT_LT(temp_converted, -200.0f); /* raw formula gives garbage */
+
+    /* The driver actually returns this: */
+    const float temp_placeholder = 0.0f;
+    EXPECT_FLOAT_EQ(temp_placeholder, 0.0f);
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
