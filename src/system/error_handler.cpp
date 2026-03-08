@@ -32,6 +32,7 @@ static constexpr const char *const s_error_names[] = {
     "NONE",
     "IMU_COMM_FAIL",
     "IMU_SELF_TEST_FAIL",
+    "IMU_FIFO_OVERFLOW",
     "I2C_ERR_BUS",
     "I2C_ERR_ARBITRATION",
     "I2C_ERR_NACK",

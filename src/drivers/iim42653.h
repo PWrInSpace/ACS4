@@ -45,7 +45,7 @@ struct ImuSample
     float    accel_mps2[3]; /* X, Y, Z — body frame, m/s² */
     float    gyro_rads[3];  /* X, Y, Z — body frame, rad/s */
     float    temp_degc;     /* die temperature, °C */
-    uint32_t timestamp_us;  /* DWT timestamp at read start */
+    uint32_t timestamp_us;  /* host µs — DWT (register) or reconstructed (FIFO) */
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -282,9 +282,11 @@ struct Iim42653Config
     AafBw       gyro_aaf;
     AafBw       accel_aaf;
     bool        enable_drdy_int1;
+    bool        enable_fifo;        /* FIFO mode with sensor-side timestamps */
+    uint16_t    fifo_watermark;     /* watermark in packets (1–130, default 1) */
 
     /**
-     * @brief Default configuration for rocket flight:
+     * @brief Default configuration for rocket flight (register-read mode):
      *   - Gyro:  ±2000 dps @ 1 kHz, 2nd-order filter BW = ODR/4
      *   - Accel: ±32 g    @ 1 kHz, 2nd-order filter BW = ODR/4
      *   - AAF:   ~536 Hz on both (rejects motor vibration aliasing)
@@ -304,6 +306,34 @@ struct Iim42653Config
             .gyro_aaf           = AafBw::bw_536(),
             .accel_aaf          = AafBw::bw_536(),
             .enable_drdy_int1   = true,
+            .enable_fifo        = false,
+            .fifo_watermark     = 1,
+        };
+    }
+
+    /**
+     * @brief Rocket configuration with FIFO and sensor-side timestamps.
+     *
+     * Same filtering as rocket_default() but uses FIFO Packet 3
+     * (accel + gyro + 8-bit temp + 16-bit ODR timestamp, 16 bytes).
+     * INT1 fires on FIFO watermark threshold instead of DRDY.
+     */
+    static constexpr Iim42653Config rocket_fifo()
+    {
+        return {
+            .gyro_fsr           = GyroFsr::DPS_2000,
+            .gyro_odr           = GyroOdr::HZ_1000,
+            .accel_fsr          = AccelFsr::G_32,
+            .accel_odr          = AccelOdr::HZ_1000,
+            .gyro_filter_order  = FilterOrder::SECOND,
+            .accel_filter_order = FilterOrder::SECOND,
+            .gyro_filter_bw     = FilterBw::ODR_DIV_4,
+            .accel_filter_bw    = FilterBw::ODR_DIV_4,
+            .gyro_aaf           = AafBw::bw_536(),
+            .accel_aaf          = AafBw::bw_536(),
+            .enable_drdy_int1   = true,
+            .enable_fifo        = true,
+            .fifo_watermark     = 1,
         };
     }
 };
@@ -361,7 +391,33 @@ class Iim42653
     [[nodiscard]] bool read(ImuSample &sample);
 
     /**
-     * @brief Run built-in self-test.
+     * @brief Read available FIFO packets into caller-provided buffer.
+     *
+     * Reads FIFO byte count, then drains up to @p max_count Packet 3
+     * frames (16 bytes each: header + accel + gyro + 8-bit temp +
+     * 16-bit ODR timestamp). Converts to SI units.
+     *
+     * Sensor-side timestamps are reconstructed into absolute host µs:
+     * the newest packet gets the current DWT time, and earlier packets
+     * are offset by the inter-sample sensor timestamp deltas.
+     *
+     * @param[out] samples  Output buffer (caller-allocated).
+     * @param      max_count  Maximum number of samples to read.
+     * @return Number of valid samples written (0 on error or FIFO empty).
+     *
+     * @pre configure() called with enable_fifo = true.
+     * @note Timestamp reconstruction is accurate for ODR ≥ 32 Hz.
+     */
+    [[nodiscard]] size_t read_fifo(ImuSample *samples, size_t max_count);
+
+    /**
+     * @brief Flush (reset) the FIFO contents.
+     *
+     * @return true on success.
+     */
+    [[nodiscard]] bool flush_fifo();
+
+    /**
      *
      * Measures sensor output with self-test enabled and disabled,
      * compares delta against factory reference values per axis.
@@ -426,6 +482,13 @@ class Iim42653
     [[nodiscard]] bool configure_ui_filters(const Iim42653Config &cfg);
     [[nodiscard]] bool configure_aaf(const Iim42653Config &cfg);
     [[nodiscard]] bool configure_interrupts(const Iim42653Config &cfg);
+    [[nodiscard]] bool configure_fifo(const Iim42653Config &cfg);
+
+    /* ── FIFO helpers ────────────────────────────────────────────────── */
+
+    [[nodiscard]] bool    read_fifo_packet(uint8_t *buf);
+    [[nodiscard]] int16_t fifo_byte_count();
+    bool                  parse_fifo_packet(const uint8_t *pkt, ImuSample &sample) const;
 
     /* ── Self-test helpers ───────────────────────────────────────────── */
 
@@ -450,6 +513,7 @@ class Iim42653
     Iim42653Config   config_       = {};
     uint8_t          current_bank_ = 0;
     bool             initialized_  = false;
+    bool             fifo_enabled_ = false;
     uint32_t         error_count_  = 0;
 
     /* Scale factors: raw * scale = SI unit */
@@ -465,6 +529,26 @@ class Iim42653
 
     /** Sensor data burst: TEMP(2) + ACCEL(6) + GYRO(6) = 14 bytes */
     static constexpr size_t kBurstLen = 14;
+
+    /** FIFO Packet 3: Header(1) + Accel(6) + Gyro(6) + Temp(1) + Timestamp(2) */
+    static constexpr size_t kFifoPacketSize = 16;
+
+    /** Max FIFO capacity: 2080 / 16 = 130 packets */
+    static constexpr size_t kFifoMaxPackets = 130;
+
+    /** FIFO header bit: FIFO is empty. */
+    static constexpr uint8_t kFifoHeaderEmpty = 0x80;
+
+    /** Expected header mask for Packet 3 with ODR timestamp: bits [6:2]. */
+    static constexpr uint8_t kFifoHeaderMask    = 0x7C;
+    static constexpr uint8_t kFifoHeaderExpected = 0x68; /* 0b0110_1000 */
+
+    /** FIFO 8-bit temperature: T(°C) = raw / 2.07 + 25 */
+    static constexpr float kFifoTempScale  = 1.0f / 2.07f;
+    static constexpr float kFifoTempOffset = 25.0f;
+
+    /** FIFO 8-bit temperature invalid marker. */
+    static constexpr int8_t kFifoTempInvalid = -128;
 };
 
 }  // namespace acs

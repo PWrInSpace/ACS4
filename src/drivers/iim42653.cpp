@@ -246,7 +246,7 @@ bool Iim42653::configure_interface()
         return false;
     }
 
-    /* Interface configuration: big-endian, FIFO count in records, SPI 4-wire. */
+    /* Interface configuration: big-endian, FIFO count in bytes, SPI 4-wire. */
     if (!write_reg(INTF_CONFIG0, 0x30))
     {
         report_error();
@@ -318,6 +318,11 @@ bool Iim42653::configure(const Iim42653Config &cfg)
     }
 
     if (!configure_aaf(cfg))
+    {
+        return false;
+    }
+
+    if (!configure_fifo(cfg))
     {
         return false;
     }
@@ -499,20 +504,129 @@ bool Iim42653::configure_interrupts(const Iim42653Config &cfg)
         return false;
     }
 
-    /* INT_CONFIG0: DRDY status clear on sensor data read. */
-    if (!write_reg(INT_CONFIG0, 0x20))
+    if (cfg.enable_fifo)
+    {
+        /*
+         * FIFO mode: route FIFO_THS (watermark) to INT1.
+         * INT_CONFIG0: FIFO_THS clear on status bit read (default).
+         */
+        if (!write_reg(INT_CONFIG0, 0x00))
+        {
+            report_error();
+            return false;
+        }
+
+        /* INT_SOURCE0: FIFO_THS_INT1_EN (bit 2). */
+        if (!write_reg(INT_SOURCE0, 0x04))
+        {
+            report_error();
+            return false;
+        }
+    }
+    else
+    {
+        /* Register-read mode: DRDY interrupt on INT1. */
+        if (!write_reg(INT_CONFIG0, 0x20))
+        {
+            report_error();
+            return false;
+        }
+
+        /* INT_SOURCE0: UI_DRDY_INT1_EN (bit 3). */
+        if (!write_reg(INT_SOURCE0, 0x08))
+        {
+            report_error();
+            return false;
+        }
+    }
+
+    return true;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+ * FIFO Configuration
+ * ═══════════════════════════════════════════════════════════════════════ */
+
+bool Iim42653::configure_fifo(const Iim42653Config &cfg)
+{
+    if (!cfg.enable_fifo)
+    {
+        fifo_enabled_ = false;
+        if (!write_reg(FIFO_CONFIG, 0x00)) /* bypass mode */
+        {
+            report_error();
+            return false;
+        }
+        return true;
+    }
+
+    /* FIFO in bypass during configuration. */
+    if (!write_reg(FIFO_CONFIG, 0x00))
     {
         report_error();
         return false;
     }
 
-    /* INT_SOURCE0: Route DRDY to INT1. */
-    if (!write_reg(INT_SOURCE0, 0x08))
+    /*
+     * TMST_CONFIG = 0x21: TMST_EN=1, FSYNC_EN=0, 1 µs resolution.
+     * Bits 7:5 preserved from reset value 0x23.
+     */
+    if (!write_reg(TMST_CONFIG, 0x21))
     {
         report_error();
         return false;
     }
 
+    /*
+     * FIFO_CONFIG1 = 0x27: FIFO_WM_GT_TH | TEMP_EN | GYRO_EN | ACCEL_EN.
+     * Produces Packet 3 (16 B): Header + Accel + Gyro + Temp8 + Timestamp16.
+     */
+    if (!write_reg(FIFO_CONFIG1, 0x27))
+    {
+        report_error();
+        return false;
+    }
+
+    /* Watermark in bytes. */
+    const uint16_t wm_packets = (cfg.fifo_watermark > 0) ? cfg.fifo_watermark : 1;
+    const uint16_t wm_bytes   = wm_packets * static_cast<uint16_t>(kFifoPacketSize);
+
+    if (!write_reg(FIFO_CONFIG2, static_cast<uint8_t>(wm_bytes & 0xFF)))
+    {
+        report_error();
+        return false;
+    }
+
+    if (!write_reg(FIFO_CONFIG3, static_cast<uint8_t>((wm_bytes >> 8) & 0x0F)))
+    {
+        report_error();
+        return false;
+    }
+
+    /* Flush FIFO (SIGNAL_PATH_RESET bit 1). */
+    auto sig = read_reg(SIGNAL_PATH_RESET);
+    if (!sig.has_value())
+    {
+        report_error();
+        return false;
+    }
+
+    if (!write_reg(SIGNAL_PATH_RESET, sig.value() | 0x02))
+    {
+        report_error();
+        return false;
+    }
+
+    chThdSleepMicroseconds(100);
+
+    /* Stream-to-FIFO mode: FIFO_CONFIG bits [7:6] = 01. */
+    if (!write_reg(FIFO_CONFIG, 0x40))
+    {
+        report_error();
+        return false;
+    }
+
+    fifo_enabled_ = true;
     return true;
 }
 
@@ -572,7 +686,8 @@ bool Iim42653::read(ImuSample &sample)
      * 0x8000 (−32768) means the sensor has not yet produced valid data.
      * Reject entire sample to prevent feeding garbage into the nav filter.
      */
-    if (raw_accel_x == kInvalidRaw || raw_accel_y == kInvalidRaw || raw_accel_z == kInvalidRaw
+    if (raw_temp == kInvalidRaw
+        || raw_accel_x == kInvalidRaw || raw_accel_y == kInvalidRaw || raw_accel_z == kInvalidRaw
         || raw_gyro_x == kInvalidRaw || raw_gyro_y == kInvalidRaw || raw_gyro_z == kInvalidRaw)
     {
         return false;
@@ -611,6 +726,225 @@ bool Iim42653::data_ready()
 
     /* DATA_RDY_INT is bit 3 of INT_STATUS (0x2D). */
     return (status.value() & 0x08) != 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * FIFO Read
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+int16_t Iim42653::fifo_byte_count()
+{
+    /*
+     * Burst-read FIFO_COUNTH (0x2E) and FIFO_COUNTL (0x2F).
+     * Reading FIFO_COUNTL latches both registers for a consistent value.
+     * INTF_CONFIG0 bit 5 = 1 → big-endian byte order.
+     */
+    uint8_t buf[2];
+    if (!read_regs(FIFO_COUNTH, buf, 2))
+    {
+        return -1;
+    }
+
+    return parse_be16(buf);
+}
+
+bool Iim42653::read_fifo_packet(uint8_t *buf)
+{
+    return read_regs(FIFO_DATA, buf, kFifoPacketSize);
+}
+
+bool Iim42653::parse_fifo_packet(const uint8_t *pkt, ImuSample &sample) const
+{
+    /*
+     * Packet 3 layout (16 bytes, big-endian):
+     *   [0]     Header
+     *   [1:2]   Accel X
+     *   [3:4]   Accel Y
+     *   [5:6]   Accel Z
+     *   [7:8]   Gyro X
+     *   [9:10]  Gyro Y
+     *   [11:12] Gyro Z
+     *   [13]    Temperature (8-bit signed)
+     *   [14:15] Timestamp (16-bit unsigned)
+     */
+    const uint8_t header = pkt[0];
+
+    /* Check FIFO-empty flag. */
+    if ((header & kFifoHeaderEmpty) != 0)
+    {
+        return false;
+    }
+
+    /* Validate header: expect accel + gyro + ODR timestamp (Packet 3). */
+    if ((header & kFifoHeaderMask) != kFifoHeaderExpected)
+    {
+        return false;
+    }
+
+    const int16_t raw_accel_x = parse_be16(&pkt[1]);
+    const int16_t raw_accel_y = parse_be16(&pkt[3]);
+    const int16_t raw_accel_z = parse_be16(&pkt[5]);
+    const int16_t raw_gyro_x  = parse_be16(&pkt[7]);
+    const int16_t raw_gyro_y  = parse_be16(&pkt[9]);
+    const int16_t raw_gyro_z  = parse_be16(&pkt[11]);
+
+    /* Reject sample if any axis reports invalid data (0x8000). */
+    if (raw_accel_x == kInvalidRaw || raw_accel_y == kInvalidRaw || raw_accel_z == kInvalidRaw
+        || raw_gyro_x == kInvalidRaw || raw_gyro_y == kInvalidRaw || raw_gyro_z == kInvalidRaw)
+    {
+        return false;
+    }
+
+    /* Convert to SI units (same formula as register-read path). */
+    sample.accel_mps2[0] = static_cast<float>(raw_accel_x) * accel_scale_;
+    sample.accel_mps2[1] = static_cast<float>(raw_accel_y) * accel_scale_;
+    sample.accel_mps2[2] = static_cast<float>(raw_accel_z) * accel_scale_;
+
+    sample.gyro_rads[0] = static_cast<float>(raw_gyro_x) * gyro_scale_;
+    sample.gyro_rads[1] = static_cast<float>(raw_gyro_y) * gyro_scale_;
+    sample.gyro_rads[2] = static_cast<float>(raw_gyro_z) * gyro_scale_;
+
+    /* 8-bit FIFO temperature: T(°C) = raw / 2.07 + 25, range -40 to 85°C. */
+    const auto raw_temp = static_cast<int8_t>(pkt[13]);
+    if (raw_temp == kFifoTempInvalid)
+    {
+        sample.temp_degc = 0.0f;
+    }
+    else
+    {
+        sample.temp_degc = static_cast<float>(raw_temp) * kFifoTempScale + kFifoTempOffset;
+    }
+
+    /* Sensor timestamp stored temporarily in timestamp_us (raw 16-bit µs).
+     * The caller (read_fifo) reconstructs absolute host timestamps. */
+    sample.timestamp_us = static_cast<uint32_t>(parse_be16(&pkt[14]) & 0xFFFF);
+
+    return true;
+}
+
+size_t Iim42653::read_fifo(ImuSample *samples, size_t max_count)
+{
+    if (!initialized_ || !fifo_enabled_ || samples == nullptr || max_count == 0)
+    {
+        return 0;
+    }
+
+    /*
+     * Capture host time — assigned to the newest sample.
+     */
+    const uint32_t host_time = timestamp_us();
+
+    /* Check for FIFO overflow (bit 1 of INT_STATUS). */
+    auto int_status = read_reg(INT_STATUS);
+    if (int_status.has_value() && (int_status.value() & 0x02))
+    {
+        error_report(ErrorCode::IMU_FIFO_OVERFLOW);
+        (void)flush_fifo();
+        return 0;
+    }
+
+    /* Read FIFO byte count and compute number of complete packets. */
+    const int16_t byte_count = fifo_byte_count();
+    if (byte_count <= 0)
+    {
+        return 0;
+    }
+
+    size_t n_packets = static_cast<size_t>(byte_count) / kFifoPacketSize;
+    if (n_packets == 0)
+    {
+        return 0;
+    }
+
+    if (n_packets > max_count)
+    {
+        n_packets = max_count;
+    }
+
+    if (n_packets > kFifoMaxPackets)
+    {
+        n_packets = kFifoMaxPackets;
+    }
+
+    /*
+     * Bulk-read all FIFO packets in a single SPI transaction.
+     * This avoids per-packet CS toggle + DMA setup overhead.
+     */
+    const size_t total_bytes = n_packets * kFifoPacketSize;
+    uint8_t bulk[kFifoMaxPackets * kFifoPacketSize];
+
+    if (!read_regs(FIFO_DATA, bulk, total_bytes))
+    {
+        report_error();
+        return 0;
+    }
+
+    /* Parse packets. FIFO outputs oldest-first. */
+    size_t valid = 0;
+    for (size_t i = 0; i < n_packets; ++i)
+    {
+        if (parse_fifo_packet(&bulk[i * kFifoPacketSize], samples[valid]))
+        {
+            ++valid;
+        }
+    }
+
+    if (valid == 0)
+    {
+        return 0;
+    }
+
+    /*
+     * Reconstruct absolute host timestamps from sensor-side deltas.
+     *
+     * Each sample.timestamp_us currently holds the raw 16-bit sensor
+     * timestamp (µs, wrapping at 65536). The newest sample (last valid)
+     * gets the host DWT time. Earlier samples are offset backward by
+     * the inter-sample sensor timestamp deltas.
+     *
+     * Unsigned 16-bit subtraction handles single wraparound correctly
+     * as long as consecutive samples are < 65.5 ms apart (ODR ≥ ~16 Hz).
+     *
+     * Raw deltas must be scaled by 32/30 (datasheet §12.7): without
+     * external CLKIN and TMST_RES=0, the sensor's internal 1 µs
+     * counter runs at 30/32 of true speed.
+     */
+    samples[valid - 1].timestamp_us = host_time;
+
+    for (size_t i = valid - 1; i > 0; --i)
+    {
+        const auto ts_this = static_cast<uint16_t>(samples[i].timestamp_us & 0xFFFF);
+        const auto ts_prev = static_cast<uint16_t>(samples[i - 1].timestamp_us & 0xFFFF);
+        const auto raw_delta = static_cast<uint16_t>(ts_this - ts_prev);
+        const uint32_t delta = static_cast<uint32_t>(raw_delta) * 32U / 30U;
+
+        samples[i - 1].timestamp_us = samples[i].timestamp_us - delta;
+    }
+
+    return valid;
+}
+
+bool Iim42653::flush_fifo()
+{
+    if (!initialized_)
+    {
+        return false;
+    }
+
+    auto sig = read_reg(SIGNAL_PATH_RESET);
+    if (!sig.has_value())
+    {
+        report_error();
+        return false;
+    }
+
+    if (!write_reg(SIGNAL_PATH_RESET, sig.value() | 0x02))
+    {
+        report_error();
+        return false;
+    }
+
+    return true;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════

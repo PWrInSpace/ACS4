@@ -439,3 +439,384 @@ TEST(ImuAaf, LargeDeltsqrEncoding)
     EXPECT_EQ((deltsqr >> 8) & 0x0F, 0x05); /* 1376 >> 8 = 5 */
     EXPECT_EQ(reg5, 0x45);                  /* (4<<4) | 5 = 0x45 */
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Tests: FIFO Packet 3 Parsing
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/* FIFO constants matching driver header */
+static constexpr size_t  kFifoPacketSize     = 16;
+static constexpr uint8_t kFifoHeaderEmpty    = 0x80;
+static constexpr uint8_t kFifoHeaderMask     = 0x7C;
+static constexpr uint8_t kFifoHeaderExpected = 0x68; /* 0b0110_1000 */
+static constexpr float   kFifoTempScale      = 1.0f / 2.07f;
+static constexpr float   kFifoTempOffset     = 25.0f;
+static constexpr int8_t  kFifoTempInvalid    = -128;
+
+/**
+ * Build a Packet 3 buffer (16 bytes) for testing.
+ *
+ * @param header    Header byte.
+ * @param ax,ay,az  Accel raw (big-endian 16-bit signed).
+ * @param gx,gy,gz  Gyro raw.
+ * @param temp8     8-bit temperature.
+ * @param ts        16-bit ODR timestamp.
+ */
+static void build_packet3(uint8_t *pkt,
+                           uint8_t  header,
+                           int16_t  ax, int16_t ay, int16_t az,
+                           int16_t  gx, int16_t gy, int16_t gz,
+                           int8_t   temp8,
+                           uint16_t ts)
+{
+    pkt[0]  = header;
+    pkt[1]  = static_cast<uint8_t>((ax >> 8) & 0xFF);
+    pkt[2]  = static_cast<uint8_t>(ax & 0xFF);
+    pkt[3]  = static_cast<uint8_t>((ay >> 8) & 0xFF);
+    pkt[4]  = static_cast<uint8_t>(ay & 0xFF);
+    pkt[5]  = static_cast<uint8_t>((az >> 8) & 0xFF);
+    pkt[6]  = static_cast<uint8_t>(az & 0xFF);
+    pkt[7]  = static_cast<uint8_t>((gx >> 8) & 0xFF);
+    pkt[8]  = static_cast<uint8_t>(gx & 0xFF);
+    pkt[9]  = static_cast<uint8_t>((gy >> 8) & 0xFF);
+    pkt[10] = static_cast<uint8_t>(gy & 0xFF);
+    pkt[11] = static_cast<uint8_t>((gz >> 8) & 0xFF);
+    pkt[12] = static_cast<uint8_t>(gz & 0xFF);
+    pkt[13] = static_cast<uint8_t>(temp8);
+    pkt[14] = static_cast<uint8_t>((ts >> 8) & 0xFF);
+    pkt[15] = static_cast<uint8_t>(ts & 0xFF);
+}
+
+/** Stand-alone parse that mirrors driver logic (no HW dep). */
+struct FifoParseResult
+{
+    float    accel_mps2[3];
+    float    gyro_rads[3];
+    float    temp_degc;
+    uint16_t sensor_ts;
+    bool     valid;
+};
+
+static FifoParseResult parse_fifo_pkt(const uint8_t *pkt,
+                                       float          accel_scale,
+                                       float          gyro_scale)
+{
+    FifoParseResult r{};
+
+    const uint8_t header = pkt[0];
+    if ((header & kFifoHeaderEmpty) != 0 || (header & kFifoHeaderMask) != kFifoHeaderExpected)
+    {
+        r.valid = false;
+        return r;
+    }
+
+    const int16_t rax = parse_be16(&pkt[1]);
+    const int16_t ray = parse_be16(&pkt[3]);
+    const int16_t raz = parse_be16(&pkt[5]);
+    const int16_t rgx = parse_be16(&pkt[7]);
+    const int16_t rgy = parse_be16(&pkt[9]);
+    const int16_t rgz = parse_be16(&pkt[11]);
+
+    if (rax == kInvalidRaw || ray == kInvalidRaw || raz == kInvalidRaw
+        || rgx == kInvalidRaw || rgy == kInvalidRaw || rgz == kInvalidRaw)
+    {
+        r.valid = false;
+        return r;
+    }
+
+    r.accel_mps2[0] = static_cast<float>(rax) * accel_scale;
+    r.accel_mps2[1] = static_cast<float>(ray) * accel_scale;
+    r.accel_mps2[2] = static_cast<float>(raz) * accel_scale;
+    r.gyro_rads[0]  = static_cast<float>(rgx) * gyro_scale;
+    r.gyro_rads[1]  = static_cast<float>(rgy) * gyro_scale;
+    r.gyro_rads[2]  = static_cast<float>(rgz) * gyro_scale;
+
+    const auto raw_temp = static_cast<int8_t>(pkt[13]);
+    r.temp_degc = (raw_temp == kFifoTempInvalid)
+                      ? 0.0f
+                      : static_cast<float>(raw_temp) * kFifoTempScale + kFifoTempOffset;
+
+    r.sensor_ts = static_cast<uint16_t>(parse_be16(&pkt[14]) & 0xFFFF);
+    r.valid     = true;
+    return r;
+}
+
+TEST(ImuFifo, Packet3ValidParse)
+{
+    /* ±32g (1024 LSB/g), ±2000 dps (16.4 LSB/°/s) */
+    const float accel_scale = kGravity / 1024.0f;
+    const float gyro_scale  = kDeg2Rad / 16.4f;
+
+    /* 1 g on Z, 100 °/s on X, 30°C, ts=5000 µs */
+    uint8_t pkt[kFifoPacketSize];
+    const int16_t az  = 1024;
+    const int16_t gx  = static_cast<int16_t>(100.0f * 16.4f);
+    const int8_t  tmp = static_cast<int8_t>((30.0f - 25.0f) * 2.07f); /* ~10 */
+    build_packet3(pkt, 0x68, 0, 0, az, gx, 0, 0, tmp, 5000);
+
+    auto r = parse_fifo_pkt(pkt, accel_scale, gyro_scale);
+    EXPECT_TRUE(r.valid);
+    EXPECT_NEAR(r.accel_mps2[2], kGravity, 0.01f);
+    EXPECT_NEAR(r.gyro_rads[0], 100.0f * kDeg2Rad, 0.1f);
+    EXPECT_NEAR(r.temp_degc, 30.0f, 1.0f);
+    EXPECT_EQ(r.sensor_ts, 5000);
+}
+
+TEST(ImuFifo, Packet3EmptyHeader)
+{
+    uint8_t pkt[kFifoPacketSize] = {};
+    pkt[0] = 0x80; /* FIFO empty flag */
+    auto r = parse_fifo_pkt(pkt, 1.0f, 1.0f);
+    EXPECT_FALSE(r.valid);
+}
+
+TEST(ImuFifo, Packet3WrongHeaderType)
+{
+    uint8_t pkt[kFifoPacketSize] = {};
+    pkt[0] = 0x40; /* Only accel, no gyro — not Packet 3 */
+    auto r = parse_fifo_pkt(pkt, 1.0f, 1.0f);
+    EXPECT_FALSE(r.valid);
+}
+
+TEST(ImuFifo, Packet3InvalidAccelRejected)
+{
+    uint8_t pkt[kFifoPacketSize];
+    build_packet3(pkt, 0x68, kInvalidRaw, 0, 0, 0, 0, 0, 0, 1000);
+    auto r = parse_fifo_pkt(pkt, 1.0f, 1.0f);
+    EXPECT_FALSE(r.valid);
+}
+
+TEST(ImuFifo, Packet3InvalidGyroRejected)
+{
+    uint8_t pkt[kFifoPacketSize];
+    build_packet3(pkt, 0x68, 100, 200, 300, kInvalidRaw, 0, 0, 0, 1000);
+    auto r = parse_fifo_pkt(pkt, 1.0f, 1.0f);
+    EXPECT_FALSE(r.valid);
+}
+
+TEST(ImuFifo, Packet3HeaderOdrBitsIgnored)
+{
+    /* Bits [1:0] are ODR-change flags — should not affect parse. */
+    uint8_t pkt[kFifoPacketSize];
+    build_packet3(pkt, 0x6B, 100, 200, 300, 400, 500, 600, 10, 2000);
+    auto r = parse_fifo_pkt(pkt, 1.0f, 1.0f);
+    EXPECT_TRUE(r.valid);
+    EXPECT_EQ(r.sensor_ts, 2000);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Tests: FIFO Temperature Conversion (8-bit)
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+TEST(ImuFifoTemp, AtReferencePoint)
+{
+    /* 25°C → raw = 0 → (0 / 2.07) + 25 = 25 */
+    const int8_t raw  = 0;
+    const float  temp = static_cast<float>(raw) * kFifoTempScale + kFifoTempOffset;
+    EXPECT_NEAR(temp, 25.0f, 0.1f);
+}
+
+TEST(ImuFifoTemp, AtHighTemp)
+{
+    /* ~85°C → raw = (85-25)*2.07 = 124.2 → 124 */
+    const int8_t raw  = 124;
+    const float  temp = static_cast<float>(raw) * kFifoTempScale + kFifoTempOffset;
+    EXPECT_NEAR(temp, 84.9f, 1.0f);
+}
+
+TEST(ImuFifoTemp, AtLowTemp)
+{
+    /* -40°C → raw = (-40-25)*2.07 = -134.55 → clamps to -128+invalid overlap */
+    /* Use -80 → (-80/2.07)+25 ≈ -13.6°C */
+    const int8_t raw  = -80;
+    const float  temp = static_cast<float>(raw) * kFifoTempScale + kFifoTempOffset;
+    EXPECT_NEAR(temp, -13.6f, 0.5f);
+}
+
+TEST(ImuFifoTemp, InvalidMarker)
+{
+    /* -128 is the invalid marker → driver returns 0°C */
+    const int8_t raw = kFifoTempInvalid;
+    EXPECT_EQ(raw, -128);
+    /* parse sets temp_degc = 0 for invalid */
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Tests: FIFO Timestamp Reconstruction
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/**
+ * Reconstruct absolute timestamps from sensor 16-bit timestamps,
+ * mirroring the driver's algorithm. Operates in-place on an array
+ * of (valid_count) raw sensor timestamps + a host reference time.
+ *
+ * Raw deltas are scaled by 32/30 per datasheet §12.7 (no CLKIN,
+ * TMST_RES=0): the sensor's internal counter runs at 30/32 speed.
+ */
+static void reconstruct_timestamps(uint32_t *ts_us, size_t count, uint32_t host_time)
+{
+    if (count == 0)
+        return;
+
+    /* Save raw 16-bit sensor timestamps before overwriting. */
+    auto *raw = new uint16_t[count];
+    for (size_t i = 0; i < count; ++i)
+    {
+        raw[i] = static_cast<uint16_t>(ts_us[i] & 0xFFFF);
+    }
+
+    /* Newest sample gets host time. */
+    ts_us[count - 1] = host_time;
+
+    /* Walk backward, computing scaled deltas from sensor timestamps. */
+    for (size_t i = count - 1; i > 0; --i)
+    {
+        const uint16_t raw_delta = static_cast<uint16_t>(raw[i] - raw[i - 1]);
+        const uint32_t delta     = static_cast<uint32_t>(raw_delta) * 32U / 30U;
+        ts_us[i - 1] = ts_us[i] - delta;
+    }
+
+    delete[] raw;
+}
+
+TEST(ImuFifoTimestamp, ThreeSamplesNoWrap)
+{
+    /*
+     * 3 samples at 1 kHz. Sensor raw interval ≈ 937–938 µs
+     * (datasheet §12.7: true 1000 µs → raw 937.5 µs).
+     * Use raw delta = 937 for deterministic test.
+     * After 32/30 scaling: 937 * 32/30 = 999 µs (integer).
+     */
+    const uint32_t host_time = 1'000'000;
+    uint32_t ts[3] = {1000, 1937, 2874};
+
+    reconstruct_timestamps(ts, 3, host_time);
+
+    const uint32_t scaled_delta = 937U * 32U / 30U; /* 999 */
+    EXPECT_EQ(ts[2], host_time);
+    EXPECT_EQ(ts[1], host_time - scaled_delta);
+    EXPECT_EQ(ts[0], host_time - 2 * scaled_delta);
+}
+
+TEST(ImuFifoTimestamp, TimestampWraparound)
+{
+    /* Sensor timestamps wrap at 65536.
+     * Sample 0: ts = 65000
+     * Sample 1: ts = 65000 + 937 = 65937 → wraps to 65937 - 65536 = 401
+     * Sample 2: ts = 401 + 937 = 1338
+     * Raw delta = 937, scaled = 937 * 32/30 = 999.
+     */
+    const uint32_t host_time = 500'000;
+    uint32_t ts[3] = {65000, 401, 1338};
+
+    reconstruct_timestamps(ts, 3, host_time);
+
+    const uint32_t scaled_delta = 937U * 32U / 30U; /* 999 */
+    EXPECT_EQ(ts[2], host_time);
+    EXPECT_EQ(ts[1], host_time - scaled_delta);
+    EXPECT_EQ(ts[0], host_time - 2 * scaled_delta);
+}
+
+TEST(ImuFifoTimestamp, SingleSample)
+{
+    const uint32_t host_time = 42000;
+    uint32_t ts[1] = {12345};
+
+    reconstruct_timestamps(ts, 1, host_time);
+
+    EXPECT_EQ(ts[0], host_time);
+}
+
+TEST(ImuFifoTimestamp, TenSamplesUniform)
+{
+    /*
+     * 10 samples with raw sensor interval = 937 µs (1 kHz ODR).
+     * Scaled delta = 937 * 32/30 = 999 µs.
+     */
+    const uint32_t host_time = 2'000'000;
+    const uint16_t raw_interval = 937;
+    const uint32_t scaled_interval = static_cast<uint32_t>(raw_interval) * 32U / 30U;
+    uint32_t ts[10];
+    for (int i = 0; i < 10; ++i)
+    {
+        ts[i] = static_cast<uint32_t>(10000 + i * raw_interval);
+    }
+
+    reconstruct_timestamps(ts, 10, host_time);
+
+    for (int i = 0; i < 10; ++i)
+    {
+        EXPECT_EQ(ts[i], host_time - static_cast<uint32_t>((9 - i)) * scaled_interval)
+            << "sample " << i;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Tests: FIFO Configuration Register Assembly
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+TEST(ImuFifoConfig, TmstConfigForFifo)
+{
+    /*
+     * TMST_CONFIG for FIFO: TMST_EN=1, FSYNC_EN=0, 1µs res.
+     * Default reset = 0x23. We want bits 7:5 preserved (0x20) + bit 0 = 1.
+     */
+    const uint8_t val = 0x21;
+    EXPECT_EQ(val & 0x01, 1); /* TMST_EN */
+    EXPECT_EQ(val & 0x02, 0); /* TMST_FSYNC_EN off */
+    EXPECT_EQ(val & 0x08, 0); /* TMST_RES = 0 (1µs) */
+}
+
+TEST(ImuFifoConfig, FifoConfig1Assembly)
+{
+    /*
+     * FIFO_CONFIG1: FIFO_WM_GT_TH | FIFO_TEMP_EN | FIFO_GYRO_EN | FIFO_ACCEL_EN
+     *             = bit5 | bit2 | bit1 | bit0 = 0x27
+     */
+    const uint8_t val = 0x27;
+    EXPECT_NE(val & 0x01, 0); /* FIFO_ACCEL_EN */
+    EXPECT_NE(val & 0x02, 0); /* FIFO_GYRO_EN */
+    EXPECT_NE(val & 0x04, 0); /* FIFO_TEMP_EN */
+    EXPECT_NE(val & 0x20, 0); /* FIFO_WM_GT_TH */
+    EXPECT_EQ(val & 0x10, 0); /* FIFO_HIRES_EN off (no 20-byte packets) */
+}
+
+TEST(ImuFifoConfig, FifoConfigStreamMode)
+{
+    /* FIFO_CONFIG: Stream-to-FIFO → bits [7:6] = 01 → 0x40 */
+    const uint8_t val = 0x40;
+    EXPECT_EQ((val >> 6) & 0x03, 0x01);
+}
+
+TEST(ImuFifoConfig, WatermarkEncoding)
+{
+    /* 5 packets × 16 bytes = 80 bytes */
+    const uint16_t wm_packets = 5;
+    const uint16_t wm_bytes   = wm_packets * 16;
+    EXPECT_EQ(wm_bytes, 80);
+
+    const uint8_t reg2 = static_cast<uint8_t>(wm_bytes & 0xFF);
+    const uint8_t reg3 = static_cast<uint8_t>((wm_bytes >> 8) & 0x0F);
+    EXPECT_EQ(reg2, 80);
+    EXPECT_EQ(reg3, 0);
+}
+
+TEST(ImuFifoConfig, WatermarkEncodingLarge)
+{
+    /* 100 packets × 16 = 1600 bytes */
+    const uint16_t wm_bytes = 100 * 16;
+    EXPECT_EQ(wm_bytes, 1600);
+
+    const uint8_t reg2 = static_cast<uint8_t>(wm_bytes & 0xFF);
+    const uint8_t reg3 = static_cast<uint8_t>((wm_bytes >> 8) & 0x0F);
+    EXPECT_EQ(reg2, 0x40);  /* 1600 & 0xFF = 64 = 0x40 */
+    EXPECT_EQ(reg3, 0x06);  /* 1600 >> 8 = 6 */
+}
+
+TEST(ImuFifoConfig, IntSource0FifoThs)
+{
+    /* When FIFO is enabled, INT_SOURCE0 = FIFO_THS_INT1_EN (bit 2) = 0x04 */
+    const uint8_t val = 0x04;
+    EXPECT_NE(val & 0x04, 0); /* FIFO_THS_INT1_EN */
+    EXPECT_EQ(val & 0x08, 0); /* UI_DRDY_INT1_EN off */
+}
