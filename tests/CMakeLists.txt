@@ -30,6 +30,7 @@ set(NAV_SOURCES
 # ── Test sources ──────────────────────────────────────────────────────────
 set(TEST_SOURCES
     unit/test_quaternion.cpp
+    unit/test_iim42653.cpp
 )
 
 # ── Test executable ───────────────────────────────────────────────────────
