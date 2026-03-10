@@ -30,6 +30,7 @@
 #pragma once
 
 #include <cstdint>
+#include <optional>
 
 #include "hal/spi_bus.h"
 
@@ -44,7 +45,7 @@ struct ImuSample
 {
     float    accel_mps2[3]; /* X, Y, Z — body frame, m/s² */
     float    gyro_rads[3];  /* X, Y, Z — body frame, rad/s */
-    float    temp_degc;     /* die temperature, °C */
+    float    temp_degc;     /* die temperature, °C (NaN if sensor data not ready) */
     uint32_t timestamp_us;  /* host µs — DWT (register) or reconstructed (FIFO) */
 };
 
@@ -554,6 +555,25 @@ class Iim42653
     [[nodiscard]] bool modify_bank_reg(uint8_t bank, uint8_t reg,
                                        uint8_t clear_mask, uint8_t set_mask);
 
+    /** RAII guard: selects register bank on construction, returns to bank 0
+     *  on destruction. Use for batching multiple operations to the same bank. */
+    class BankScope
+    {
+      public:
+        BankScope(Iim42653 &imu, uint8_t bank)
+            : imu_(imu), ok_(imu.select_bank(bank)) {}
+        ~BankScope() { if (ok_) (void)imu_.select_bank(0); }
+
+        explicit operator bool() const noexcept { return ok_; }
+
+        BankScope(const BankScope &)            = delete;
+        BankScope &operator=(const BankScope &) = delete;
+
+      private:
+        Iim42653 &imu_;
+        bool      ok_;
+    };
+
     /* ── Scale factor computation ────────────────────────────────────── */
 
     void compute_scale_factors();
@@ -625,8 +645,9 @@ class Iim42653
     bool             fifo_enabled_ = false;
     uint32_t         error_count_  = 0;
 
-    /* FIFO bulk-read buffer — lives in BSS instead of stack to avoid
-     * blowing the RTOS thread stack (2080 B). */
+    /* FIFO bulk-read buffer — lives in the Iim42653 instance, so ensure
+     * the object is statically allocated or on a thread stack with
+     * sufficient headroom (≥ 2.5 kB for this buffer alone). */
     uint8_t  fifo_bulk_buf_[kFifoMaxPackets * kFifoPacketSize] {};
     uint16_t raw_sensor_ts_[kFifoMaxPackets] {};
 

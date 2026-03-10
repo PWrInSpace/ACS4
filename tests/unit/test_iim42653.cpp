@@ -14,6 +14,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include <limits>
 #include <gtest/gtest.h>
 
 /* ── Constants matching the driver ────────────────────────────────────── */
@@ -228,18 +229,18 @@ TEST(ImuInvalidData, AllAxesValid)
 TEST(ImuInvalidData, TempInvalidStillConvert)
 {
     /* Temperature 0x8000 → driver does NOT reject the whole sample.
-     * Only accel/gyro axes cause rejection; invalid temp gets a 0.0°C
-     * placeholder (consistent between register-read and FIFO paths). */
+     * Only accel/gyro axes cause rejection; invalid temp gets NaN. */
     const int16_t raw_temp = kInvalidRaw;
 
-    /* Verify the placeholder path: when raw == kInvalidRaw the driver
-     * returns 0.0°C instead of the nonsensical −222°C conversion. */
+    /* Verify the raw formula gives nonsensical value. */
     const float temp_converted = static_cast<float>(raw_temp) * kTempScale + kTempOffset;
     EXPECT_LT(temp_converted, -200.0f); /* raw formula gives garbage */
 
-    /* The driver actually returns this: */
-    const float temp_placeholder = 0.0f;
-    EXPECT_FLOAT_EQ(temp_placeholder, 0.0f);
+    /* The driver returns NaN for invalid temperature readings. */
+    const float temp_result = (raw_temp == kInvalidRaw)
+        ? std::numeric_limits<float>::quiet_NaN()
+        : static_cast<float>(raw_temp) * kTempScale + kTempOffset;
+    EXPECT_TRUE(std::isnan(temp_result));
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -776,13 +777,15 @@ TEST(ImuFifoConfig, TmstConfigForFifo)
 TEST(ImuFifoConfig, FifoConfig1Assembly)
 {
     /*
-     * FIFO_CONFIG1: FIFO_WM_GT_TH | FIFO_TEMP_EN | FIFO_GYRO_EN | FIFO_ACCEL_EN
-     *             = bit5 | bit2 | bit1 | bit0 = 0x27
+     * FIFO_CONFIG1: FIFO_WM_GT_TH | FIFO_TMST_FSYNC_EN | FIFO_TEMP_EN | FIFO_GYRO_EN | FIFO_ACCEL_EN
+     *             = bit5 | bit3 | bit2 | bit1 | bit0 = 0x2F
+     * bit3 (FIFO_TMST_FSYNC_EN) is required for ODR timestamps in Packet 3.
      */
-    const uint8_t val = 0x27;
+    const uint8_t val = 0x2F;
     EXPECT_NE(val & 0x01, 0); /* FIFO_ACCEL_EN */
     EXPECT_NE(val & 0x02, 0); /* FIFO_GYRO_EN */
     EXPECT_NE(val & 0x04, 0); /* FIFO_TEMP_EN */
+    EXPECT_NE(val & 0x08, 0); /* FIFO_TMST_FSYNC_EN (ODR timestamps) */
     EXPECT_NE(val & 0x20, 0); /* FIFO_WM_GT_TH */
     EXPECT_EQ(val & 0x10, 0); /* FIFO_HIRES_EN off (no 20-byte packets) */
 }
