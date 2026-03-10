@@ -8,7 +8,7 @@
  * IIM-42653 datasheet, with specific timing constraints:
  *   - 1 ms after soft reset
  *   - 200 µs after sensor enable in PWR_MGMT0
- *   - 30 ms gyro startup time
+ *   - 45 ms minimum gyro startup time (PWR_MGMT0 register spec)
  *   - INT_ASYNC_RESET must be cleared in INT_CONFIG1
  *
  * All bus access goes through the SpiBus abstraction (DMA, mutex-protected).
@@ -128,6 +128,33 @@ std::optional<uint8_t> Iim42653::read_bank_reg(uint8_t bank, uint8_t reg)
     return val;
 }
 
+bool Iim42653::modify_reg(uint8_t reg, uint8_t clear_mask, uint8_t set_mask)
+{
+    auto val = read_reg(reg);
+    if (!val.has_value())
+    {
+        return false;
+    }
+
+    return write_reg(reg, (val.value() & ~clear_mask) | set_mask);
+}
+
+bool Iim42653::modify_bank_reg(uint8_t bank, uint8_t reg,
+                                uint8_t clear_mask, uint8_t set_mask)
+{
+    if (!select_bank(bank))
+    {
+        return false;
+    }
+
+    const bool ok = modify_reg(reg, clear_mask, set_mask);
+
+    /* Always return to bank 0. */
+    (void)select_bank(0);
+
+    return ok;
+}
+
 /* ═══════════════════════════════════════════════════════════════════════════
  * Error Handling
  * ═══════════════════════════════════════════════════════════════════════════ */
@@ -215,8 +242,9 @@ bool Iim42653::configure_interface()
     /* Clear INT_ASYNC_RESET (bit 4) in INT_CONFIG1. */
     IMU_TRY(modify_reg(INT_CONFIG1, 1U << 4, 0x00));
 
-    /* Interface configuration: big-endian, FIFO count in bytes, SPI 4-wire. */
-    IMU_TRY(write_reg(INTF_CONFIG0, 0x30));
+    /* Interface configuration: big-endian, FIFO count in bytes, SPI 4-wire,
+     * disable I2C/I3C slave interface (UI_SIFS_CFG = 0b11). */
+    IMU_TRY(write_reg(INTF_CONFIG0, 0x33));
 
     /* Clock source — PLL auto-select (CLKSEL = 01). */
     IMU_TRY(modify_reg(INTF_CONFIG1, 0x03, 0x01));
@@ -224,8 +252,9 @@ bool Iim42653::configure_interface()
     /* SPI slew rate configuration. */
     IMU_TRY(write_reg(DRIVE_CONFIG, 0x05));
 
-    /* Disable I3C for clean SPI-only operation. */
-    IMU_TRY(write_bank_reg(1, INTF_CONFIG6, 0x00));
+    /* Disable I3C for clean SPI-only operation.
+     * Reset value is 0x5F — preserve reserved bit 6, clear I3C bits [4:0]. */
+    IMU_TRY(modify_bank_reg(1, INTF_CONFIG6, 0x1F, 0x00));
 
     return true;
 }
@@ -304,8 +333,8 @@ bool Iim42653::configure_odr_fsr(const Iim42653Config &cfg)
 
 bool Iim42653::configure_ui_filters(const Iim42653Config &cfg)
 {
-    /* GYRO_CONFIG1: [7:5] = TEMP_FILT_BW, [3:2] = GYRO_UI_FILT_ORD, preserve [1:0]. */
-    IMU_TRY(modify_reg(GYRO_CONFIG1, 0xFC,
+    /* GYRO_CONFIG1: [7:5] = TEMP_FILT_BW, [3:2] = GYRO_UI_FILT_ORD, preserve [4] (reserved) and [1:0]. */
+    IMU_TRY(modify_reg(GYRO_CONFIG1, 0xEC,
                         (static_cast<uint8_t>(cfg.temp_filter_bw) << 5)
                         | (static_cast<uint8_t>(cfg.gyro_filter_order) << 2)));
 
@@ -337,6 +366,11 @@ bool Iim42653::configure_aaf(const Iim42653Config &cfg)
         /* Enable gyro AAF (clear GYRO_AAF_DIS bit 1). */
         IMU_TRY(modify_bank_reg(1, GYRO_CONFIG_STATIC2, 0x02, 0x00));
     }
+    else
+    {
+        /* Explicitly disable gyro AAF (set GYRO_AAF_DIS bit 1). */
+        IMU_TRY(modify_bank_reg(1, GYRO_CONFIG_STATIC2, 0x00, 0x02));
+    }
 
     /* Accel AAF — Bank 2. */
     if (cfg.accel_aaf.is_enabled())
@@ -349,6 +383,11 @@ bool Iim42653::configure_aaf(const Iim42653Config &cfg)
         IMU_TRY(write_bank_reg(2, ACCEL_CONFIG_STATIC4,
                                static_cast<uint8_t>((cfg.accel_aaf.bitshift << 4)
                                                     | ((cfg.accel_aaf.deltsqr >> 8) & 0x0F))));
+    }
+    else
+    {
+        /* Explicitly disable accel AAF (set ACCEL_AAF_DIS bit 0). */
+        IMU_TRY(modify_bank_reg(2, ACCEL_CONFIG_STATIC2, 0x00, 0x01));
     }
 
     return true;
@@ -472,7 +511,7 @@ bool Iim42653::configure_fifo(const Iim42653Config &cfg)
 
     /*
      * TMST_CONFIG = 0x21: TMST_EN=1, FSYNC_EN=0, 1 µs resolution.
-     * Bits 7:5 preserved from reset value 0x23.
+     * Overwrites reset value 0x23 (clears TMST_FSYNC_EN at bit 1).
      */
     IMU_TRY(write_reg(TMST_CONFIG, 0x21));
 
@@ -812,7 +851,9 @@ bool Iim42653::set_offsets(const float gyro_bias_dps[3], const float accel_bias_
      */
     auto to_gyro_lsb = [](float dps) -> int16_t {
         const float clamped = std::clamp(dps, -64.0f, 64.0f);
-        return static_cast<int16_t>(std::lround(clamped * 32.0f));
+        const auto raw = static_cast<int16_t>(std::lround(clamped * 32.0f));
+        /* 12-bit signed range: −2048 to +2047. Clamp to avoid sign flip at +64 dps. */
+        return std::clamp(raw, static_cast<int16_t>(-2048), static_cast<int16_t>(2047));
     };
 
     auto to_accel_lsb = [](float g) -> int16_t {
