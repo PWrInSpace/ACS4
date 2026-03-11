@@ -179,6 +179,7 @@ set(APP_SOURCES
     src/main.cpp
     src/hal/i2c_bus.cpp
     src/hal/spi_bus.cpp
+    src/drivers/iim42653.cpp
     src/system/debug_shell.cpp
     src/system/error_handler.cpp
     src/system/params.cpp
