@@ -163,7 +163,7 @@ static const uint8_t vcom_string1[] = {USB_DESC_BYTE(22),
                                        0};
 
 /* Product. */
-static const uint8_t vcom_string2[] = {USB_DESC_BYTE(48),
+static const uint8_t vcom_string2[] = {USB_DESC_BYTE(50),
                                        USB_DESC_BYTE(USB_DESCRIPTOR_STRING),
                                        'A',
                                        0,

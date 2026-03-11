@@ -20,6 +20,7 @@ extern "C" {
 #include "shell.h"
 }
 
+#include "drivers/iim42653.h"
 #include "system/error_handler.h"
 #include "system/params.h"
 #include "utils/profiler.h"
@@ -188,6 +189,51 @@ static void cmd_param(BaseSequentialStream *chp, int argc, char *argv[])
     }
 }
 
+static void cmd_sensor(BaseSequentialStream *chp, int argc, char *argv[])
+{
+    if (argc == 0)
+    {
+        chprintf(chp, "Usage: sensor imu\r\n");
+        return;
+    }
+
+    if (strcmp(argv[0], "imu") == 0)
+    {
+        auto *imu = acs::imu_instance();
+        if (imu == nullptr)
+        {
+            chprintf(chp, "IMU not available (no hardware or init failed)\r\n");
+            return;
+        }
+
+        acs::ImuSample sample{};
+        if (!imu->read(sample))
+        {
+            chprintf(chp, "IMU read failed (errors: %lu)\r\n", imu->error_count());
+            return;
+        }
+
+        chprintf(chp,
+                 "Accel [m/s2]: X=%+.3f  Y=%+.3f  Z=%+.3f\r\n",
+                 static_cast<double>(sample.accel_mps2[0]),
+                 static_cast<double>(sample.accel_mps2[1]),
+                 static_cast<double>(sample.accel_mps2[2]));
+        chprintf(chp,
+                 "Gyro [rad/s]: X=%+.4f  Y=%+.4f  Z=%+.4f\r\n",
+                 static_cast<double>(sample.gyro_rads[0]),
+                 static_cast<double>(sample.gyro_rads[1]),
+                 static_cast<double>(sample.gyro_rads[2]));
+        chprintf(chp, "Temp:         %.1f C\r\n", static_cast<double>(sample.temp_degc));
+        chprintf(chp, "Timestamp:    %lu us\r\n", sample.timestamp_us);
+        chprintf(chp, "Errors:       %lu\r\n", imu->error_count());
+    }
+    else
+    {
+        chprintf(chp, "Unknown sensor: %s\r\n", argv[0]);
+        chprintf(chp, "Available: imu\r\n");
+    }
+}
+
 /* ── Shell command table ──────────────────────────────────────────────── */
 
 static const ShellCommand shell_commands[] = {
@@ -198,6 +244,7 @@ static const ShellCommand shell_commands[] = {
     {   "perf",    cmd_perf},
     { "errors",  cmd_errors},
     {  "param",   cmd_param},
+    { "sensor",  cmd_sensor},
     {  nullptr,     nullptr}
 };
 

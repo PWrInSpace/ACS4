@@ -686,4 +686,10 @@ class Iim42653
     static constexpr int8_t kFifoTempInvalid = -128;
 };
 
+/**
+ * @brief Get pointer to the global IMU driver instance.
+ * @return Pointer to initialized Iim42653, or nullptr if unavailable.
+ */
+Iim42653 *imu_instance();
+
 }  // namespace acs

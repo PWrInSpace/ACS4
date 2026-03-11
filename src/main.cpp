@@ -25,12 +25,14 @@ extern "C" {
 #include <chprintf.h>
 }
 
+#include "drivers/iim42653.h"
 #include "system/debug_shell.h"
 #include "system/error_handler.h"
 #include "system/watchdog.h"
 #include "utils/timestamp.h"
 
 #if defined(STM32H725xx)
+    #include "hal/spi_bus.h"
     #include "system/usb_cdc.h"
 #endif
 
@@ -41,6 +43,35 @@ extern "C" {
 #else
     #define LINE_STATUS LINE_LED1
     #define LINE_ERROR  LINE_LED3
+#endif
+
+/* ── Sensor hardware (custom PCB only — Nucleo has no sensors) ───────────── */
+#if defined(STM32H725xx)
+
+static const SPIConfig imu_spi_cfg = {
+    .circular = false,
+    .slave    = false,
+    .data_cb  = nullptr,
+    .error_cb = nullptr,
+    .cfg1     = SPI_CFG1_MBR_DIV8,             /* kernel_clk / 8 */
+    .cfg2     = SPI_CFG2_CPOL | SPI_CFG2_CPHA, /* SPI Mode 3 */
+};
+
+static acs::SpiBus   g_spi;
+static acs::Iim42653 g_imu;
+
+acs::Iim42653 *acs::imu_instance()
+{
+    return g_imu.is_initialized() ? &g_imu : nullptr;
+}
+
+#else /* NUCLEO — no sensors */
+
+acs::Iim42653 *acs::imu_instance()
+{
+    return nullptr;
+}
+
 #endif
 
 /*---------------------------------------------------------------------------*/
@@ -106,6 +137,32 @@ int main()
     chprintf(serial, "  System clock: %lu MHz\r\n", STM32_SYS_CK / 1000000UL);
     chprintf(serial, "========================================\r\n");
     chprintf(serial, "\r\n");
+
+    /* Initialize sensor SPI bus and IMU (custom PCB only). */
+#if defined(STM32H725xx)
+    if (g_spi.init(&SPID2))
+    {
+        if (g_imu.init(g_spi, LINE_IMU_CS, imu_spi_cfg))
+        {
+            if (g_imu.configure(acs::Iim42653Config::rocket_default()))
+            {
+                chprintf(serial, "IMU: IIM-42653 OK\r\n");
+            }
+            else
+            {
+                chprintf(serial, "IMU: configure FAILED\r\n");
+            }
+        }
+        else
+        {
+            chprintf(serial, "IMU: init FAILED\r\n");
+        }
+    }
+    else
+    {
+        chprintf(serial, "SPI bus: init FAILED\r\n");
+    }
+#endif
 
     /* Create worker threads. */
     chThdCreateStatic(waBlinker, sizeof(waBlinker), NORMALPRIO, Blinker, nullptr);
