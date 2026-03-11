@@ -33,9 +33,19 @@ namespace acs
 
 using namespace iim42653_reg;
 
+// NOLINTBEGIN(cppcoreguidelines-avoid-do-while)
+
 /** Write-or-fail: calls report_error() and returns false on SPI failure. */
-// NOLINTNEXTLINE(cppcoreguidelines-avoid-do-while)
-#define IMU_TRY(expr) do { if (!(expr)) { report_error(); return false; } } while (0)
+#define IMU_TRY(expr)       \
+    do                      \
+    {                       \
+        if (!(expr))        \
+        {                   \
+            report_error(); \
+            return false;   \
+        }                   \
+    }                       \
+    while (0)
 
 /* ═══════════════════════════════════════════════════════════════════════════
  * Byte Parsing
@@ -54,8 +64,9 @@ bool Iim42653::has_invalid(const int16_t data[3])
     return data[0] == kInvalidRaw || data[1] == kInvalidRaw || data[2] == kInvalidRaw;
 }
 
-void Iim42653::convert_inertial(const int16_t accel[3], const int16_t gyro[3],
-                                ImuSample &sample) const
+void Iim42653::convert_inertial(const int16_t accel[3],
+                                const int16_t gyro[3],
+                                ImuSample    &sample) const
 {
     for (int i = 0; i < 3; ++i)
     {
@@ -140,8 +151,7 @@ bool Iim42653::modify_reg(uint8_t reg, uint8_t clear_mask, uint8_t set_mask)
     return write_reg(reg, (val.value() & ~clear_mask) | set_mask);
 }
 
-bool Iim42653::modify_bank_reg(uint8_t bank, uint8_t reg,
-                                uint8_t clear_mask, uint8_t set_mask)
+bool Iim42653::modify_bank_reg(uint8_t bank, uint8_t reg, uint8_t clear_mask, uint8_t set_mask)
 {
     if (!select_bank(bank))
     {
@@ -172,10 +182,8 @@ void Iim42653::report_error()
 
 float Iim42653::gyro_sensitivity(GyroFsr fsr)
 {
-    static constexpr float kTable[] = {
-        8.2f, 16.4f, 32.8f, 65.5f, 131.0f, 262.0f, 524.3f, 1048.6f
-    };
-    const auto idx = static_cast<uint8_t>(fsr) >> 5;
+    static constexpr float kTable[] = {8.2f, 16.4f, 32.8f, 65.5f, 131.0f, 262.0f, 524.3f, 1048.6f};
+    const auto             idx      = static_cast<uint8_t>(fsr) >> 5;
     chDbgAssert(idx < 8, "invalid gyro FSR");
     return (idx < 8) ? kTable[idx] : kTable[1];
 }
@@ -183,7 +191,7 @@ float Iim42653::gyro_sensitivity(GyroFsr fsr)
 float Iim42653::accel_sensitivity(AccelFsr fsr)
 {
     static constexpr float kTable[] = {1024.0f, 2048.0f, 4096.0f, 8192.0f};
-    const auto idx = static_cast<uint8_t>(fsr) >> 5;
+    const auto             idx      = static_cast<uint8_t>(fsr) >> 5;
     chDbgAssert(idx < 4, "invalid accel FSR");
     return (idx < 4) ? kTable[idx] : kTable[0];
 }
@@ -336,18 +344,19 @@ bool Iim42653::configure_odr_fsr(const Iim42653Config &cfg)
 
 bool Iim42653::configure_ui_filters(const Iim42653Config &cfg)
 {
-    /* GYRO_CONFIG1: [7:5] = TEMP_FILT_BW, [3:2] = GYRO_UI_FILT_ORD, preserve [4] (reserved) and [1:0]. */
-    IMU_TRY(modify_reg(GYRO_CONFIG1, 0xEC,
-                        (static_cast<uint8_t>(cfg.temp_filter_bw) << 5)
-                        | (static_cast<uint8_t>(cfg.gyro_filter_order) << 2)));
+    /* GYRO_CONFIG1: [7:5] = TEMP_FILT_BW, [3:2] = GYRO_UI_FILT_ORD, preserve [4] (reserved) and
+     * [1:0]. */
+    IMU_TRY(modify_reg(GYRO_CONFIG1,
+                       0xEC,
+                       (static_cast<uint8_t>(cfg.temp_filter_bw) << 5)
+                           | (static_cast<uint8_t>(cfg.gyro_filter_order) << 2)));
 
     /* ACCEL_CONFIG1: [4:3] = ACCEL_UI_FILT_ORD. */
-    IMU_TRY(modify_reg(ACCEL_CONFIG1, 0x18,
-                        static_cast<uint8_t>(cfg.accel_filter_order) << 3));
+    IMU_TRY(modify_reg(ACCEL_CONFIG1, 0x18, static_cast<uint8_t>(cfg.accel_filter_order) << 3));
 
     /* GYRO_ACCEL_CONFIG0: [7:4] = accel BW, [3:0] = gyro BW. */
-    const uint8_t filter_bw = (static_cast<uint8_t>(cfg.accel_filter_bw) << 4)
-                              | static_cast<uint8_t>(cfg.gyro_filter_bw);
+    const uint8_t filter_bw =
+        (static_cast<uint8_t>(cfg.accel_filter_bw) << 4) | static_cast<uint8_t>(cfg.gyro_filter_bw);
     IMU_TRY(write_reg(GYRO_ACCEL_CONFIG0, filter_bw));
 
     return true;
@@ -358,14 +367,18 @@ bool Iim42653::configure_aaf(const Iim42653Config &cfg)
 {
     /* Gyro AAF — Bank 1 (single bank switch for all gyro AAF registers). */
     {
-        BankScope bank(*this, 1);
-        if (!bank) { report_error(); return false; }
+        const BankScope bank(*this, 1);
+        if (!bank)
+        {
+            report_error();
+            return false;
+        }
 
         if (cfg.gyro_aaf.is_enabled())
         {
             IMU_TRY(write_reg(GYRO_CONFIG_STATIC3, cfg.gyro_aaf.delt & 0x3F));
-            IMU_TRY(write_reg(GYRO_CONFIG_STATIC4,
-                              static_cast<uint8_t>(cfg.gyro_aaf.deltsqr & 0xFF)));
+            IMU_TRY(
+                write_reg(GYRO_CONFIG_STATIC4, static_cast<uint8_t>(cfg.gyro_aaf.deltsqr & 0xFF)));
             IMU_TRY(write_reg(GYRO_CONFIG_STATIC5,
                               static_cast<uint8_t>((cfg.gyro_aaf.bitshift << 4)
                                                    | ((cfg.gyro_aaf.deltsqr >> 8) & 0x0F))));
@@ -382,8 +395,12 @@ bool Iim42653::configure_aaf(const Iim42653Config &cfg)
 
     /* Accel AAF — Bank 2 (single bank switch for all accel AAF registers). */
     {
-        BankScope bank(*this, 2);
-        if (!bank) { report_error(); return false; }
+        const BankScope bank(*this, 2);
+        if (!bank)
+        {
+            report_error();
+            return false;
+        }
 
         if (cfg.accel_aaf.is_enabled())
         {
@@ -445,7 +462,7 @@ bool Iim42653::configure_notch_filter(const Iim42653Config &cfg)
     }
 
     /* Encode as unsigned 9-bit value for register packing. */
-    const auto coswz_u9 = static_cast<uint16_t>(nf_coswz_raw & 0x01FF);
+    const auto coswz_u9  = static_cast<uint16_t>(nf_coswz_raw & 0x01FF);
     const auto coswz_low = static_cast<uint8_t>(coswz_u9 & 0xFF);
     const auto coswz_hi  = static_cast<uint8_t>((coswz_u9 >> 8) & 0x01);
 
@@ -458,14 +475,17 @@ bool Iim42653::configure_notch_filter(const Iim42653Config &cfg)
      *   bit 4 = Y NF_COSWZ_SEL
      *   bit 5 = Z NF_COSWZ_SEL
      */
-    const uint8_t static9 =
-        (coswz_hi << 0) | (coswz_hi << 1) | (coswz_hi << 2)
-        | (nf_coswz_sel << 3) | (nf_coswz_sel << 4) | (nf_coswz_sel << 5);
+    const uint8_t static9 = (coswz_hi << 0) | (coswz_hi << 1) | (coswz_hi << 2)
+                            | (nf_coswz_sel << 3) | (nf_coswz_sel << 4) | (nf_coswz_sel << 5);
 
     /* Program all notch filter registers in a single bank 1 session. */
     {
-        BankScope bank(*this, 1);
-        if (!bank) { report_error(); return false; }
+        const BankScope bank(*this, 1);
+        if (!bank)
+        {
+            report_error();
+            return false;
+        }
 
         /* Same frequency for all 3 axes. */
         IMU_TRY(write_reg(GYRO_CONFIG_STATIC6, coswz_low));
@@ -474,8 +494,8 @@ bool Iim42653::configure_notch_filter(const Iim42653Config &cfg)
         IMU_TRY(write_reg(GYRO_CONFIG_STATIC9, static9));
 
         /* GYRO_CONFIG_STATIC10 (0x13): [6:4] = NF_BW_SEL. */
-        IMU_TRY(modify_reg(GYRO_CONFIG_STATIC10, 0x70,
-                           static_cast<uint8_t>(cfg.gyro_notch.bw) << 4));
+        IMU_TRY(
+            modify_reg(GYRO_CONFIG_STATIC10, 0x70, static_cast<uint8_t>(cfg.gyro_notch.bw) << 4));
 
         /* Enable notch filter: clear GYRO_NF_DIS (bit 0) in GYRO_CONFIG_STATIC2. */
         IMU_TRY(modify_reg(GYRO_CONFIG_STATIC2, 0x01, 0x00));
@@ -614,7 +634,7 @@ bool Iim42653::read(ImuSample &sample)
     }
 
     /* Parse big-endian 16-bit signed values. */
-    const int16_t raw_temp   = parse_be16(&buf[0]);
+    const int16_t raw_temp     = parse_be16(&buf[0]);
     const int16_t raw_accel[3] = {parse_be16(&buf[2]), parse_be16(&buf[4]), parse_be16(&buf[6])};
     const int16_t raw_gyro[3]  = {parse_be16(&buf[8]), parse_be16(&buf[10]), parse_be16(&buf[12])};
 
@@ -829,8 +849,8 @@ size_t Iim42653::read_fifo(ImuSample *samples, size_t max_count)
 
     for (size_t i = valid - 1; i > 0; --i)
     {
-        const auto raw_delta = static_cast<uint16_t>(raw_sensor_ts_[i] - raw_sensor_ts_[i - 1]);
-        const uint32_t delta = (static_cast<uint32_t>(raw_delta) * 32U + 15U) / 30U;
+        const auto     raw_delta = static_cast<uint16_t>(raw_sensor_ts_[i] - raw_sensor_ts_[i - 1]);
+        const uint32_t delta     = (static_cast<uint32_t>(raw_delta) * 32U + 15U) / 30U;
 
         samples[i - 1].timestamp_us = samples[i].timestamp_us - delta;
     }
@@ -890,7 +910,7 @@ bool Iim42653::set_offsets(const float gyro_bias_dps[3], const float accel_bias_
      */
     auto to_gyro_lsb = [](float dps) -> int16_t {
         const float clamped = std::clamp(dps, -64.0f, 64.0f);
-        const auto raw = static_cast<int16_t>(std::lround(clamped * 32.0f));
+        const auto  raw     = static_cast<int16_t>(std::lround(clamped * 32.0f));
         /* 12-bit signed range: −2048 to +2047. Clamp to avoid sign flip at +64 dps. */
         return std::clamp(raw, static_cast<int16_t>(-2048), static_cast<int16_t>(2047));
     };
@@ -918,21 +938,25 @@ bool Iim42653::set_offsets(const float gyro_bias_dps[3], const float accel_bias_
 
     /* Pack into 9 register bytes. Each 12-bit value splits across two regs. */
     const uint8_t regs[9] = {
-        static_cast<uint8_t>(ugx & 0xFF),                                               /* USER0 */
-        static_cast<uint8_t>(((ugy & 0x0F00) >> 4) | ((ugx >> 8) & 0x0F)),             /* USER1 */
-        static_cast<uint8_t>(ugy & 0xFF),                                               /* USER2 */
-        static_cast<uint8_t>(ugz & 0xFF),                                               /* USER3 */
-        static_cast<uint8_t>(((uax & 0x0F00) >> 4) | ((ugz >> 8) & 0x0F)),             /* USER4 */
-        static_cast<uint8_t>(uax & 0xFF),                                               /* USER5 */
-        static_cast<uint8_t>(uay & 0xFF),                                               /* USER6 */
-        static_cast<uint8_t>(((uaz & 0x0F00) >> 4) | ((uay >> 8) & 0x0F)),             /* USER7 */
-        static_cast<uint8_t>(uaz & 0xFF),                                               /* USER8 */
+        static_cast<uint8_t>(ugx & 0xFF),                                  /* USER0 */
+        static_cast<uint8_t>(((ugy & 0x0F00) >> 4) | ((ugx >> 8) & 0x0F)), /* USER1 */
+        static_cast<uint8_t>(ugy & 0xFF),                                  /* USER2 */
+        static_cast<uint8_t>(ugz & 0xFF),                                  /* USER3 */
+        static_cast<uint8_t>(((uax & 0x0F00) >> 4) | ((ugz >> 8) & 0x0F)), /* USER4 */
+        static_cast<uint8_t>(uax & 0xFF),                                  /* USER5 */
+        static_cast<uint8_t>(uay & 0xFF),                                  /* USER6 */
+        static_cast<uint8_t>(((uaz & 0x0F00) >> 4) | ((uay >> 8) & 0x0F)), /* USER7 */
+        static_cast<uint8_t>(uaz & 0xFF),                                  /* USER8 */
     };
 
     /* Write all 9 offset registers in a single bank 4 session. */
     {
-        BankScope bank(*this, 4);
-        if (!bank) { report_error(); return false; }
+        const BankScope bank(*this, 4);
+        if (!bank)
+        {
+            report_error();
+            return false;
+        }
 
         for (uint8_t i = 0; i < 9; ++i)
         {
@@ -1103,7 +1127,7 @@ bool Iim42653::collect_st_samples(int32_t accel_sum[3], int32_t gyro_sum[3], int
     {
         /* Wait for fresh sample (DRDY) to avoid reading stale data. */
         static constexpr int kDrdyTimeoutIter = 20;
-        bool ready = false;
+        bool                 ready            = false;
         for (int w = 0; w < kDrdyTimeoutIter; ++w)
         {
             if (data_ready())
@@ -1145,26 +1169,38 @@ bool Iim42653::read_st_factory_refs(float gyro_ref[3], float accel_ref[3])
 
     /* Read gyro self-test references — single bank 1 session. */
     {
-        BankScope bank(*this, 1);
-        if (!bank) { return false; }
+        const BankScope bank(*this, 1);
+        if (!bank)
+        {
+            return false;
+        }
 
         for (int ax = 0; ax < 3; ++ax)
         {
             auto val = read_reg(gyro_st_regs[ax]);
-            if (!val.has_value()) { return false; }
+            if (!val.has_value())
+            {
+                return false;
+            }
             gyro_codes[ax] = val.value();
         }
     }
 
     /* Read accel self-test references — single bank 2 session. */
     {
-        BankScope bank(*this, 2);
-        if (!bank) { return false; }
+        const BankScope bank(*this, 2);
+        if (!bank)
+        {
+            return false;
+        }
 
         for (int ax = 0; ax < 3; ++ax)
         {
             auto val = read_reg(accel_st_regs[ax]);
-            if (!val.has_value()) { return false; }
+            if (!val.has_value())
+            {
+                return false;
+            }
             accel_codes[ax] = val.value();
         }
     }
@@ -1173,12 +1209,12 @@ bool Iim42653::read_st_factory_refs(float gyro_ref[3], float accel_ref[3])
     for (int ax = 0; ax < 3; ++ax)
     {
         gyro_ref[ax] = (gyro_codes[ax] != 0)
-                            ? 2620.0f * std::pow(1.01f, static_cast<float>(gyro_codes[ax]) - 1.0f)
-                            : 0.0f;
+                           ? 2620.0f * std::pow(1.01f, static_cast<float>(gyro_codes[ax]) - 1.0f)
+                           : 0.0f;
 
         accel_ref[ax] = (accel_codes[ax] != 0)
-                             ? 2620.0f * std::pow(1.01f, static_cast<float>(accel_codes[ax]) - 1.0f)
-                             : 0.0f;
+                            ? 2620.0f * std::pow(1.01f, static_cast<float>(accel_codes[ax]) - 1.0f)
+                            : 0.0f;
     }
 
     return true;
@@ -1242,3 +1278,5 @@ bool Iim42653::validate_st_results(const float gyro_response[3],
 }  // namespace acs
 
 #undef IMU_TRY
+
+// NOLINTEND(cppcoreguidelines-avoid-do-while)

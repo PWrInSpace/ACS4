@@ -104,7 +104,7 @@ inline constexpr uint8_t REG_BANK_SEL       = 0x76;
 
 /* ── Bank 1 ────────────────────────────────────────────────────────────── */
 
-inline constexpr uint8_t SENSOR_CONFIG0      = 0x03; /* Bank 1 */
+inline constexpr uint8_t SENSOR_CONFIG0       = 0x03; /* Bank 1 */
 inline constexpr uint8_t GYRO_CONFIG_STATIC2  = 0x0B; /* Bank 1 */
 inline constexpr uint8_t GYRO_CONFIG_STATIC3  = 0x0C; /* Bank 1 */
 inline constexpr uint8_t GYRO_CONFIG_STATIC4  = 0x0D; /* Bank 1 */
@@ -115,11 +115,11 @@ inline constexpr uint8_t GYRO_CONFIG_STATIC8  = 0x11; /* Bank 1 — Z NF_COSWZ[7
 inline constexpr uint8_t GYRO_CONFIG_STATIC9  = 0x12; /* Bank 1 — NF_COSWZ[8] + SEL */
 inline constexpr uint8_t GYRO_CONFIG_STATIC10 = 0x13; /* Bank 1 — NF_BW_SEL [6:4] */
 inline constexpr uint8_t XG_ST_DATA           = 0x5F; /* Bank 1 */
-inline constexpr uint8_t YG_ST_DATA          = 0x60; /* Bank 1 */
-inline constexpr uint8_t ZG_ST_DATA          = 0x61; /* Bank 1 */
-inline constexpr uint8_t INTF_CONFIG4        = 0x7A; /* Bank 1 */
-inline constexpr uint8_t INTF_CONFIG5        = 0x7B; /* Bank 1 */
-inline constexpr uint8_t INTF_CONFIG6        = 0x7C; /* Bank 1 */
+inline constexpr uint8_t YG_ST_DATA           = 0x60; /* Bank 1 */
+inline constexpr uint8_t ZG_ST_DATA           = 0x61; /* Bank 1 */
+inline constexpr uint8_t INTF_CONFIG4         = 0x7A; /* Bank 1 */
+inline constexpr uint8_t INTF_CONFIG5         = 0x7B; /* Bank 1 */
+inline constexpr uint8_t INTF_CONFIG6         = 0x7C; /* Bank 1 */
 
 /* ── Bank 2 ────────────────────────────────────────────────────────────── */
 
@@ -312,12 +312,18 @@ struct AafBw
  */
 struct GyroNotchConfig
 {
-    float   freq_hz = 0.0f; /* Notch frequency in Hz (1000–3000), 0 = disabled */
+    float   freq_hz = 0.0f;            /* Notch frequency in Hz (1000–3000), 0 = disabled */
     NotchBw bw      = NotchBw::HZ_329; /* Notch bandwidth */
 
-    bool is_enabled() const { return freq_hz >= 1000.0f && freq_hz <= 3000.0f; }
+    bool is_enabled() const
+    {
+        return freq_hz >= 1000.0f && freq_hz <= 3000.0f;
+    }
 
-    static constexpr GyroNotchConfig disabled() { return {0.0f, NotchBw::HZ_329}; }
+    static constexpr GyroNotchConfig disabled()
+    {
+        return {0.0f, NotchBw::HZ_329};
+    }
 };
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -326,21 +332,21 @@ struct GyroNotchConfig
 
 struct Iim42653Config
 {
-    GyroFsr      gyro_fsr;
-    GyroOdr      gyro_odr;
-    AccelFsr     accel_fsr;
-    AccelOdr     accel_odr;
-    FilterOrder  gyro_filter_order;
-    FilterOrder  accel_filter_order;
-    FilterBw     gyro_filter_bw;
-    FilterBw     accel_filter_bw;
-    TempFilterBw temp_filter_bw;
-    AafBw        gyro_aaf;
-    AafBw        accel_aaf;
+    GyroFsr         gyro_fsr;
+    GyroOdr         gyro_odr;
+    AccelFsr        accel_fsr;
+    AccelOdr        accel_odr;
+    FilterOrder     gyro_filter_order;
+    FilterOrder     accel_filter_order;
+    FilterBw        gyro_filter_bw;
+    FilterBw        accel_filter_bw;
+    TempFilterBw    temp_filter_bw;
+    AafBw           gyro_aaf;
+    AafBw           accel_aaf;
     GyroNotchConfig gyro_notch;
-    bool         enable_drdy_int1;
-    bool         enable_fifo;        /* FIFO mode with sensor-side timestamps */
-    uint16_t     fifo_watermark;     /* watermark in packets (1–130, default 1) */
+    bool            enable_drdy_int1;
+    bool            enable_fifo;    /* FIFO mode with sensor-side timestamps */
+    uint16_t        fifo_watermark; /* watermark in packets (1–130, default 1) */
 
     /**
      * @brief Default configuration for rocket flight (register-read mode):
@@ -552,19 +558,30 @@ class Iim42653
     [[nodiscard]] bool modify_reg(uint8_t reg, uint8_t clear_mask, uint8_t set_mask);
 
     /** Read-modify-write on a non-zero bank register, then return to bank 0. */
-    [[nodiscard]] bool modify_bank_reg(uint8_t bank, uint8_t reg,
-                                       uint8_t clear_mask, uint8_t set_mask);
+    [[nodiscard]] bool
+    modify_bank_reg(uint8_t bank, uint8_t reg, uint8_t clear_mask, uint8_t set_mask);
 
     /** RAII guard: selects register bank on construction, returns to bank 0
      *  on destruction. Use for batching multiple operations to the same bank. */
     class BankScope
     {
       public:
-        BankScope(Iim42653 &imu, uint8_t bank)
-            : imu_(imu), ok_(imu.select_bank(bank)) {}
-        ~BankScope() { if (ok_) (void)imu_.select_bank(0); }
+        BankScope(Iim42653 &imu, uint8_t bank) : imu_(imu), ok_(imu.select_bank(bank))
+        {
+        }
 
-        explicit operator bool() const noexcept { return ok_; }
+        ~BankScope()
+        {
+            if (ok_)
+            {
+                (void)imu_.select_bank(0);
+            }
+        }
+
+        explicit operator bool() const noexcept
+        {
+            return ok_;
+        }
 
         BankScope(const BankScope &)            = delete;
         BankScope &operator=(const BankScope &) = delete;
@@ -598,8 +615,7 @@ class Iim42653
 
     /* ── Conversion helpers ───────────────────────────────────────────── */
 
-    void        convert_inertial(const int16_t accel[3], const int16_t gyro[3],
-                                 ImuSample &sample) const;
+    void convert_inertial(const int16_t accel[3], const int16_t gyro[3], ImuSample &sample) const;
     static bool has_invalid(const int16_t data[3]);
 
     /* ── Self-test helpers ───────────────────────────────────────────── */
@@ -648,8 +664,8 @@ class Iim42653
     /* FIFO bulk-read buffer — lives in the Iim42653 instance, so ensure
      * the object is statically allocated or on a thread stack with
      * sufficient headroom (≥ 2.5 kB for this buffer alone). */
-    uint8_t  fifo_bulk_buf_[kFifoMaxPackets * kFifoPacketSize] {};
-    uint16_t raw_sensor_ts_[kFifoMaxPackets] {};
+    uint8_t  fifo_bulk_buf_[kFifoMaxPackets * kFifoPacketSize]{};
+    uint16_t raw_sensor_ts_[kFifoMaxPackets]{};
 
     /* Scale factors: raw * scale = SI unit */
     float accel_scale_ = 0.0f; /* LSB -> m/s² */
@@ -659,7 +675,7 @@ class Iim42653
     static constexpr uint8_t kFifoHeaderEmpty = 0x80;
 
     /** Expected header mask for Packet 3 with ODR timestamp: bits [6:2]. */
-    static constexpr uint8_t kFifoHeaderMask    = 0x7C;
+    static constexpr uint8_t kFifoHeaderMask     = 0x7C;
     static constexpr uint8_t kFifoHeaderExpected = 0x68; /* 0b0110_1000 */
 
     /** FIFO 8-bit temperature: T(°C) = raw / 2.07 + 25 */
