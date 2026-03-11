@@ -9,6 +9,7 @@
 
 #include <cstdlib>
 #include <cstring>
+#include <iterator>
 
 extern "C" {
 #include "ch.h"
@@ -81,8 +82,8 @@ static void cmd_threads(BaseSequentialStream *chp, int argc, char *argv[])
                                         "WTMSG",
                                         "FINAL"};
 
-    chprintf(chp, "%-16s %4s %6s %10s %s\r\n", "Name", "Prio", "Stack", "FreeStack", "State");
-    chprintf(chp, "------------------------------------------------------\r\n");
+    chprintf(chp, "%-16s %4s %10s %s\r\n", "Name", "Prio", "FreeStack", "State");
+    chprintf(chp, "----------------------------------------------\r\n");
 
     thread_t *tp = chRegFirstThread();
     while (tp != nullptr)
@@ -90,7 +91,7 @@ static void cmd_threads(BaseSequentialStream *chp, int argc, char *argv[])
         uint32_t stk_free = 0;
 #if CH_DBG_FILL_THREADS == TRUE
         auto *begin = reinterpret_cast<uint8_t *>(tp->wabase);
-        auto *end   = reinterpret_cast<uint8_t *>(tp + 1);
+        auto *end   = reinterpret_cast<uint8_t *>(tp);
         while (begin < end && *begin == CH_DBG_STACK_FILL_VALUE)
         {
             begin++;
@@ -100,14 +101,12 @@ static void cmd_threads(BaseSequentialStream *chp, int argc, char *argv[])
 
         const char *name = (tp->name != nullptr) ? tp->name : "<unnamed>";
         const auto  idx  = static_cast<unsigned>(tp->state);
-        const char *st =
-            (idx < sizeof(state_names) / sizeof(state_names[0])) ? state_names[idx] : "???";
+        const char *st = (idx < std::size(state_names)) ? state_names[idx] : "???";
 
         chprintf(chp,
-                 "%-16s %4u %6s %10lu %s\r\n",
+                 "%-16s %4u %10lu %s\r\n",
                  name,
                  static_cast<unsigned>(tp->hdr.pqueue.prio),
-                 "---",
                  stk_free,
                  st);
 
@@ -166,7 +165,13 @@ static void cmd_param(BaseSequentialStream *chp, int argc, char *argv[])
     }
     else if (strcmp(argv[0], "set") == 0 && argc >= 3)
     {
-        auto val = static_cast<float>(strtod(argv[2], nullptr));
+        char *endptr = nullptr;
+        auto  val    = static_cast<float>(strtod(argv[2], &endptr));
+        if (endptr == argv[2])
+        {
+            chprintf(chp, "Invalid number: %s\r\n", argv[2]);
+            return;
+        }
         if (acs::param_set(argv[1], val))
         {
             chprintf(chp, "%s = %.6f\r\n", argv[1], static_cast<double>(val));
@@ -238,14 +243,14 @@ static void cmd_sensor(BaseSequentialStream *chp, int argc, char *argv[])
 
 static const ShellCommand shell_commands[] = {
     {"version", cmd_version},
-    { "uptime",  cmd_uptime},
+    {"uptime",  cmd_uptime },
     {"threads", cmd_threads},
-    { "reboot",  cmd_reboot},
-    {   "perf",    cmd_perf},
-    { "errors",  cmd_errors},
-    {  "param",   cmd_param},
-    { "sensor",  cmd_sensor},
-    {  nullptr,     nullptr}
+    {"reboot",  cmd_reboot },
+    {"perf",    cmd_perf   },
+    {"errors",  cmd_errors },
+    {"param",   cmd_param  },
+    {"sensor",  cmd_sensor },
+    {nullptr,   nullptr    }
 };
 
 /* ── Shell thread ─────────────────────────────────────────────────────── */
@@ -261,7 +266,12 @@ namespace acs
 
 static void shell_launch(BaseSequentialStream *stream)
 {
-    shellInit();
+    static bool initialized = false;
+    if (!initialized)
+    {
+        shellInit();
+        initialized = true;
+    }
 
     static ShellConfig shell_cfg = {
         .sc_channel  = stream,
