@@ -222,7 +222,7 @@ bool Iim42653::init(SpiBus &spi, ioline_t cs_line, const SPIConfig &spi_cfg)
      * Write SOFT_RESET_CONFIG = 1 to DEVICE_CONFIG (0x11).
      * Wait 1 ms for reset to complete.
      */
-    IMU_TRY(write_reg(DEVICE_CONFIG, 0x01));
+    IMU_TRY(write_reg(DEVICE_CONFIG, SOFT_RESET_EN));
     chThdSleepMilliseconds(2);
 
     /*
@@ -251,21 +251,21 @@ bool Iim42653::init(SpiBus &spi, ioline_t cs_line, const SPIConfig &spi_cfg)
 bool Iim42653::configure_interface()
 {
     /* Clear INT_ASYNC_RESET (bit 4) in INT_CONFIG1. */
-    IMU_TRY(modify_reg(INT_CONFIG1, 1U << 4, 0x00));
+    IMU_TRY(modify_reg(INT_CONFIG1, INT_ASYNC_RESET_BIT, 0x00));
 
     /* Interface configuration: big-endian, FIFO count in bytes, SPI 4-wire,
      * disable I2C/I3C slave interface (UI_SIFS_CFG = 0b11). */
-    IMU_TRY(write_reg(INTF_CONFIG0, 0x33));
+    IMU_TRY(write_reg(INTF_CONFIG0, INTF0_BIGENDIAN_SPI_ONLY));
 
     /* Clock source — PLL auto-select (CLKSEL = 01). */
-    IMU_TRY(modify_reg(INTF_CONFIG1, 0x03, 0x01));
+    IMU_TRY(modify_reg(INTF_CONFIG1, CLKSEL_MASK, CLKSEL_PLL_AUTO));
 
     /* SPI slew rate configuration. */
-    IMU_TRY(write_reg(DRIVE_CONFIG, 0x05));
+    IMU_TRY(write_reg(DRIVE_CONFIG, SPI_SLEW_DEFAULT));
 
     /* Disable I3C for clean SPI-only operation.
      * Reset value is 0x5F — preserve reserved bit 6, clear I3C bits [4:0]. */
-    IMU_TRY(modify_bank_reg(1, INTF_CONFIG6, 0x1F, 0x00));
+    IMU_TRY(modify_bank_reg(1, INTF_CONFIG6, I3C_EN_MASK, 0x00));
 
     return true;
 }
@@ -285,7 +285,7 @@ bool Iim42653::configure(const Iim42653Config &cfg)
     compute_scale_factors();
 
     /* Ensure sensors are off before configuration. */
-    IMU_TRY(write_reg(PWR_MGMT0, 0x00));
+    IMU_TRY(write_reg(PWR_MGMT0, PWR_OFF));
     chThdSleepMicroseconds(300);
 
     if (!configure_odr_fsr(cfg))
@@ -319,7 +319,7 @@ bool Iim42653::configure(const Iim42653Config &cfg)
     }
 
     /* Enable sensors: gyro + accel in Low Noise mode, temperature on. */
-    IMU_TRY(write_reg(PWR_MGMT0, 0x0F));
+    IMU_TRY(write_reg(PWR_MGMT0, PWR_GYRO_ACCEL_LN));
 
     /* Wait for gyro startup (45 ms datasheet minimum) + margin. */
     chThdSleepMilliseconds(50);
@@ -347,12 +347,12 @@ bool Iim42653::configure_ui_filters(const Iim42653Config &cfg)
     /* GYRO_CONFIG1: [7:5] = TEMP_FILT_BW, [3:2] = GYRO_UI_FILT_ORD, preserve [4] (reserved) and
      * [1:0]. */
     IMU_TRY(modify_reg(GYRO_CONFIG1,
-                       0xEC,
+                       GYRO_CFG1_FILTER_MASK,
                        (static_cast<uint8_t>(cfg.temp_filter_bw) << 5)
                            | (static_cast<uint8_t>(cfg.gyro_filter_order) << 2)));
 
     /* ACCEL_CONFIG1: [4:3] = ACCEL_UI_FILT_ORD. */
-    IMU_TRY(modify_reg(ACCEL_CONFIG1, 0x18, static_cast<uint8_t>(cfg.accel_filter_order) << 3));
+    IMU_TRY(modify_reg(ACCEL_CONFIG1, ACCEL_CFG1_FILT_ORD_MASK, static_cast<uint8_t>(cfg.accel_filter_order) << 3));
 
     /* GYRO_ACCEL_CONFIG0: [7:4] = accel BW, [3:0] = gyro BW. */
     const uint8_t filter_bw =
@@ -384,12 +384,12 @@ bool Iim42653::configure_aaf(const Iim42653Config &cfg)
                                                    | ((cfg.gyro_aaf.deltsqr >> 8) & 0x0F))));
 
             /* Enable gyro AAF (clear GYRO_AAF_DIS bit 1). */
-            IMU_TRY(modify_reg(GYRO_CONFIG_STATIC2, 0x02, 0x00));
+            IMU_TRY(modify_reg(GYRO_CONFIG_STATIC2, GYRO_AAF_DIS, 0x00));
         }
         else
         {
             /* Explicitly disable gyro AAF (set GYRO_AAF_DIS bit 1). */
-            IMU_TRY(modify_reg(GYRO_CONFIG_STATIC2, 0x00, 0x02));
+            IMU_TRY(modify_reg(GYRO_CONFIG_STATIC2, 0x00, GYRO_AAF_DIS));
         }
     }
 
@@ -416,7 +416,7 @@ bool Iim42653::configure_aaf(const Iim42653Config &cfg)
         else
         {
             /* Explicitly disable accel AAF (set ACCEL_AAF_DIS bit 0). */
-            IMU_TRY(modify_reg(ACCEL_CONFIG_STATIC2, 0x00, 0x01));
+            IMU_TRY(modify_reg(ACCEL_CONFIG_STATIC2, 0x00, ACCEL_AAF_DIS));
         }
     }
 
@@ -429,7 +429,7 @@ bool Iim42653::configure_notch_filter(const Iim42653Config &cfg)
     if (!cfg.gyro_notch.is_enabled())
     {
         /* Ensure notch filter is disabled (set GYRO_NF_DIS = bit 0). */
-        IMU_TRY(modify_bank_reg(1, GYRO_CONFIG_STATIC2, 0x00, 0x01));
+        IMU_TRY(modify_bank_reg(1, GYRO_CONFIG_STATIC2, 0x00, GYRO_NF_DIS));
         return true;
     }
 
@@ -495,10 +495,10 @@ bool Iim42653::configure_notch_filter(const Iim42653Config &cfg)
 
         /* GYRO_CONFIG_STATIC10 (0x13): [6:4] = NF_BW_SEL. */
         IMU_TRY(
-            modify_reg(GYRO_CONFIG_STATIC10, 0x70, static_cast<uint8_t>(cfg.gyro_notch.bw) << 4));
+            modify_reg(GYRO_CONFIG_STATIC10, NF_BW_SEL_MASK, static_cast<uint8_t>(cfg.gyro_notch.bw) << 4));
 
         /* Enable notch filter: clear GYRO_NF_DIS (bit 0) in GYRO_CONFIG_STATIC2. */
-        IMU_TRY(modify_reg(GYRO_CONFIG_STATIC2, 0x01, 0x00));
+        IMU_TRY(modify_reg(GYRO_CONFIG_STATIC2, GYRO_NF_DIS, 0x00));
     }
 
     return true;
@@ -513,19 +513,19 @@ bool Iim42653::configure_interrupts(const Iim42653Config &cfg)
     }
 
     /* INT_CONFIG: active-high, push-pull, pulsed. */
-    IMU_TRY(write_reg(INT_CONFIG, 0x03));
+    IMU_TRY(write_reg(INT_CONFIG, INT_ACTIVE_HIGH_PP_PULSE));
 
     if (cfg.enable_fifo)
     {
         /* FIFO mode: route FIFO_THS (watermark) to INT1. */
-        IMU_TRY(write_reg(INT_CONFIG0, 0x00));
-        IMU_TRY(write_reg(INT_SOURCE0, 0x04));
+        IMU_TRY(write_reg(INT_CONFIG0, INT_CFG0_FIFO_MODE));
+        IMU_TRY(write_reg(INT_SOURCE0, FIFO_THS_INT1_EN));
     }
     else
     {
         /* Register-read mode: DRDY interrupt on INT1. */
-        IMU_TRY(write_reg(INT_CONFIG0, 0x20));
-        IMU_TRY(write_reg(INT_SOURCE0, 0x08));
+        IMU_TRY(write_reg(INT_CONFIG0, INT_CFG0_DRDY_MODE));
+        IMU_TRY(write_reg(INT_SOURCE0, UI_DRDY_INT1_EN));
     }
 
     return true;
@@ -541,18 +541,18 @@ bool Iim42653::configure_fifo(const Iim42653Config &cfg)
     if (!cfg.enable_fifo)
     {
         fifo_enabled_ = false;
-        IMU_TRY(write_reg(FIFO_CONFIG, 0x00)); /* bypass mode */
+        IMU_TRY(write_reg(FIFO_CONFIG, FIFO_BYPASS)); /* bypass mode */
         return true;
     }
 
     /* FIFO in bypass during configuration. */
-    IMU_TRY(write_reg(FIFO_CONFIG, 0x00));
+    IMU_TRY(write_reg(FIFO_CONFIG, FIFO_BYPASS));
 
     /*
      * TMST_CONFIG = 0x21: TMST_EN=1, FSYNC_EN=0, 1 µs resolution.
      * Overwrites reset value 0x23 (clears TMST_FSYNC_EN at bit 1).
      */
-    IMU_TRY(write_reg(TMST_CONFIG, 0x21));
+    IMU_TRY(write_reg(TMST_CONFIG, TMST_EN_1US));
 
     /*
      * FIFO_CONFIG1 = 0x2F:
@@ -563,7 +563,7 @@ bool Iim42653::configure_fifo(const Iim42653Config &cfg)
      *   bit 0 = FIFO_ACCEL_EN
      * Produces Packet 3 (16 B): Header + Accel + Gyro + Temp8 + Timestamp16.
      */
-    IMU_TRY(write_reg(FIFO_CONFIG1, 0x2F));
+    IMU_TRY(write_reg(FIFO_CONFIG1, FIFO1_PKT3_ALL));
 
     /* Watermark in bytes. Clamp to hardware max (2080 B / 16 B = 130 packets).
      * Datasheet §6.3: physical FIFO = 2048 B + read cache, driver max = 2080 B.
@@ -579,12 +579,12 @@ bool Iim42653::configure_fifo(const Iim42653Config &cfg)
     IMU_TRY(write_reg(FIFO_CONFIG3, static_cast<uint8_t>((wm_bytes >> 8) & 0x0F)));
 
     /* Flush FIFO (SIGNAL_PATH_RESET bit 1). */
-    IMU_TRY(modify_reg(SIGNAL_PATH_RESET, 0x00, 0x02));
+    IMU_TRY(modify_reg(SIGNAL_PATH_RESET, 0x00, FIFO_FLUSH));
 
     chThdSleepMicroseconds(100);
 
     /* Stream-to-FIFO mode: FIFO_CONFIG bits [7:6] = 01. */
-    IMU_TRY(write_reg(FIFO_CONFIG, 0x40));
+    IMU_TRY(write_reg(FIFO_CONFIG, FIFO_STREAM));
 
     fifo_enabled_ = true;
     return true;
@@ -669,7 +669,7 @@ bool Iim42653::data_ready()
     }
 
     /* DATA_RDY_INT is bit 3 of INT_STATUS (0x2D). */
-    return (status.value() & 0x08) != 0;
+    return (status.value() & DATA_RDY_INT) != 0;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -765,7 +765,7 @@ size_t Iim42653::read_fifo(ImuSample *samples, size_t max_count)
 
     /* Check for FIFO overflow (bit 1 of INT_STATUS). */
     auto int_status = read_reg(INT_STATUS);
-    if (int_status.has_value() && (int_status.value() & 0x02) != 0)
+    if (int_status.has_value() && (int_status.value() & FIFO_OVERFLOW_INT) != 0)
     {
         error_report(ErrorCode::IMU_FIFO_OVERFLOW);
         (void)flush_fifo();
@@ -865,7 +865,7 @@ bool Iim42653::flush_fifo()
         return false;
     }
 
-    IMU_TRY(modify_reg(SIGNAL_PATH_RESET, 0x00, 0x02));
+    IMU_TRY(modify_reg(SIGNAL_PATH_RESET, 0x00, FIFO_FLUSH));
     return true;
 }
 
@@ -887,7 +887,7 @@ bool Iim42653::set_offsets(const float gyro_bias_dps[3], const float accel_bias_
         report_error();
         return false;
     }
-    if ((pwr.value() & 0x0F) != 0)
+    if ((pwr.value() & PWR_SENSOR_MASK) != 0)
     {
         chDbgAssert(false, "set_offsets: sensors must be OFF");
         return false;
@@ -1029,7 +1029,7 @@ bool Iim42653::self_test()
     }
 
     /* Enable self-test. */
-    if (!write_reg(SELF_TEST_CONFIG, 0x7F))
+    if (!write_reg(SELF_TEST_CONFIG, ST_ENABLE_ALL))
     {
         restore();
         return false;
@@ -1043,13 +1043,13 @@ bool Iim42653::self_test()
 
     if (!collect_st_samples(accel_on, gyro_on, kNumSamples))
     {
-        (void)write_reg(SELF_TEST_CONFIG, 0x00);
+        (void)write_reg(SELF_TEST_CONFIG, ST_DISABLE);
         restore();
         return false;
     }
 
     /* Disable self-test. */
-    if (!write_reg(SELF_TEST_CONFIG, 0x00))
+    if (!write_reg(SELF_TEST_CONFIG, ST_DISABLE))
     {
         restore();
         return false;
@@ -1092,7 +1092,7 @@ bool Iim42653::setup_self_test_mode()
 {
     static constexpr int kSettleMs = 100;
 
-    if (!write_reg(PWR_MGMT0, 0x00))
+    if (!write_reg(PWR_MGMT0, PWR_OFF))
     {
         return false;
     }
@@ -1112,7 +1112,7 @@ bool Iim42653::setup_self_test_mode()
         return false;
     }
 
-    if (!write_reg(PWR_MGMT0, 0x0F))
+    if (!write_reg(PWR_MGMT0, PWR_GYRO_ACCEL_LN))
     {
         return false;
     }

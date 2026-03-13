@@ -142,9 +142,86 @@ inline constexpr uint8_t OFFSET_USER6 = 0x7D; /* Bank 4 — accel Y low[7:0] */
 inline constexpr uint8_t OFFSET_USER7 = 0x7E; /* Bank 4 — accel Y hi[3:0] | accel Z hi[7:4] */
 inline constexpr uint8_t OFFSET_USER8 = 0x7F; /* Bank 4 — accel Z low[7:0] */
 
-/* ── Constants ─────────────────────────────────────────────────────────── */
+/* ── Register Field Values ─────────────────────────────────────────────── */
 
+/* DEVICE_CONFIG (0x11) */
+inline constexpr uint8_t SOFT_RESET_EN = 0x01;
+
+/* DRIVE_CONFIG (0x13) */
+inline constexpr uint8_t SPI_SLEW_DEFAULT = 0x05;
+
+/* INT_CONFIG (0x14) */
+inline constexpr uint8_t INT_ACTIVE_HIGH_PP_PULSE = 0x03;
+
+/* FIFO_CONFIG (0x16) */
+inline constexpr uint8_t FIFO_BYPASS = 0x00;
+inline constexpr uint8_t FIFO_STREAM = 0x40;
+
+/* INT_STATUS (0x2D) */
+inline constexpr uint8_t DATA_RDY_INT      = 0x08;
+inline constexpr uint8_t FIFO_OVERFLOW_INT = 0x02;
+
+/* SIGNAL_PATH_RESET (0x4B) */
+inline constexpr uint8_t FIFO_FLUSH = 0x02;
+
+/* INTF_CONFIG0 (0x4C) */
+inline constexpr uint8_t INTF0_BIGENDIAN_SPI_ONLY = 0x33;
+
+/* INTF_CONFIG1 (0x4D) */
+inline constexpr uint8_t CLKSEL_MASK     = 0x03;
+inline constexpr uint8_t CLKSEL_PLL_AUTO = 0x01;
+
+/* PWR_MGMT0 (0x4E) */
+inline constexpr uint8_t PWR_OFF           = 0x00;
+inline constexpr uint8_t PWR_GYRO_ACCEL_LN = 0x0F;
+inline constexpr uint8_t PWR_SENSOR_MASK   = 0x0F;
+
+/* GYRO_CONFIG1 (0x51) */
+inline constexpr uint8_t GYRO_CFG1_FILTER_MASK = 0xEC;
+
+/* ACCEL_CONFIG1 (0x53) */
+inline constexpr uint8_t ACCEL_CFG1_FILT_ORD_MASK = 0x18;
+
+/* TMST_CONFIG (0x54) */
+inline constexpr uint8_t TMST_EN_1US = 0x21;
+
+/* FIFO_CONFIG1 (0x5F) */
+inline constexpr uint8_t FIFO1_PKT3_ALL = 0x2F;
+
+/* INT_CONFIG0 (0x63) */
+inline constexpr uint8_t INT_CFG0_FIFO_MODE = 0x00;
+inline constexpr uint8_t INT_CFG0_DRDY_MODE = 0x20;
+
+/* INT_CONFIG1 (0x64) */
+inline constexpr uint8_t INT_ASYNC_RESET_BIT = 1U << 4;
+
+/* INT_SOURCE0 (0x65) */
+inline constexpr uint8_t FIFO_THS_INT1_EN = 0x04;
+inline constexpr uint8_t UI_DRDY_INT1_EN  = 0x08;
+
+/* SELF_TEST_CONFIG (0x70) */
+inline constexpr uint8_t ST_ENABLE_ALL = 0x7F;
+inline constexpr uint8_t ST_DISABLE    = 0x00;
+
+/* WHO_AM_I (0x75) */
 inline constexpr uint8_t WHO_AM_I_VALUE = 0x56;
+
+/* ── Bank 1 Field Values ──────────────────────────────────────────────── */
+
+/* GYRO_CONFIG_STATIC2 (Bank 1, 0x0B) */
+inline constexpr uint8_t GYRO_AAF_DIS = 0x02;
+inline constexpr uint8_t GYRO_NF_DIS  = 0x01;
+
+/* GYRO_CONFIG_STATIC10 (Bank 1, 0x13) */
+inline constexpr uint8_t NF_BW_SEL_MASK = 0x70;
+
+/* INTF_CONFIG6 (Bank 1, 0x7C) */
+inline constexpr uint8_t I3C_EN_MASK = 0x1F;
+
+/* ── Bank 2 Field Values ──────────────────────────────────────────────── */
+
+/* ACCEL_CONFIG_STATIC2 (Bank 2, 0x03) */
+inline constexpr uint8_t ACCEL_AAF_DIS = 0x01;
 
 }  // namespace iim42653_reg
 
