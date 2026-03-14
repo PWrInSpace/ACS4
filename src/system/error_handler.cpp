@@ -4,7 +4,8 @@
 
 #include "system/error_handler.h"
 
-#include <cstring>
+#include <algorithm>
+#include <iterator>
 
 extern "C" {
 #include "ch.h"
@@ -113,7 +114,7 @@ const char *error_name(ErrorCode code)
 void error_clear_all()
 {
     chSysLock();
-    memset(s_errors, 0, sizeof(s_errors));
+    std::fill(std::begin(s_errors), std::end(s_errors), ErrorEntry{});
     chSysUnlock();
 }
 

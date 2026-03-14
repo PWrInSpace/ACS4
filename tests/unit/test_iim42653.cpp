@@ -681,7 +681,7 @@ static void reconstruct_timestamps(uint32_t *ts_us, size_t count, uint32_t host_
     for (size_t i = count - 1; i > 0; --i)
     {
         const uint16_t raw_delta = static_cast<uint16_t>(raw[i] - raw[i - 1]);
-        const uint32_t delta     = static_cast<uint32_t>(raw_delta) * 32U / 30U;
+        const uint32_t delta     = (static_cast<uint32_t>(raw_delta) * 32U + 15U) / 30U;
         ts_us[i - 1]             = ts_us[i] - delta;
     }
 
@@ -694,14 +694,14 @@ TEST(ImuFifoTimestamp, ThreeSamplesNoWrap)
      * 3 samples at 1 kHz. Sensor raw interval ≈ 937–938 µs
      * (datasheet §12.7: true 1000 µs → raw 937.5 µs).
      * Use raw delta = 937 for deterministic test.
-     * After 32/30 scaling: 937 * 32/30 = 999 µs (integer).
+     * After 32/30 scaling with rounding: (937 * 32 + 15) / 30 = 999 µs.
      */
     const uint32_t host_time = 1'000'000;
     uint32_t       ts[3]     = {1000, 1937, 2874};
 
     reconstruct_timestamps(ts, 3, host_time);
 
-    const uint32_t scaled_delta = 937U * 32U / 30U; /* 999 */
+    const uint32_t scaled_delta = (937U * 32U + 15U) / 30U; /* 999 */
     EXPECT_EQ(ts[2], host_time);
     EXPECT_EQ(ts[1], host_time - scaled_delta);
     EXPECT_EQ(ts[0], host_time - 2 * scaled_delta);
@@ -713,14 +713,14 @@ TEST(ImuFifoTimestamp, TimestampWraparound)
      * Sample 0: ts = 65000
      * Sample 1: ts = 65000 + 937 = 65937 → wraps to 65937 - 65536 = 401
      * Sample 2: ts = 401 + 937 = 1338
-     * Raw delta = 937, scaled = 937 * 32/30 = 999.
+     * Raw delta = 937, scaled = (937 * 32 + 15) / 30 = 999.
      */
     const uint32_t host_time = 500'000;
     uint32_t       ts[3]     = {65000, 401, 1338};
 
     reconstruct_timestamps(ts, 3, host_time);
 
-    const uint32_t scaled_delta = 937U * 32U / 30U; /* 999 */
+    const uint32_t scaled_delta = (937U * 32U + 15U) / 30U; /* 999 */
     EXPECT_EQ(ts[2], host_time);
     EXPECT_EQ(ts[1], host_time - scaled_delta);
     EXPECT_EQ(ts[0], host_time - 2 * scaled_delta);
@@ -740,11 +740,11 @@ TEST(ImuFifoTimestamp, TenSamplesUniform)
 {
     /*
      * 10 samples with raw sensor interval = 937 µs (1 kHz ODR).
-     * Scaled delta = 937 * 32/30 = 999 µs.
+     * Scaled delta = (937 * 32 + 15) / 30 = 999 µs.
      */
     const uint32_t host_time       = 2'000'000;
     const uint16_t raw_interval    = 937;
-    const uint32_t scaled_interval = static_cast<uint32_t>(raw_interval) * 32U / 30U;
+    const uint32_t scaled_interval = (static_cast<uint32_t>(raw_interval) * 32U + 15U) / 30U;
     uint32_t       ts[10];
     for (int i = 0; i < 10; ++i)
     {

@@ -27,7 +27,16 @@ extern "C" {
 namespace acs
 {
 
-using namespace ms5611_cmd;
+namespace
+{
+
+constexpr uint8_t CMD_RESET      = 0x1E;
+constexpr uint8_t CMD_ADC_READ   = 0x00;
+constexpr uint8_t CMD_CONVERT_D1 = 0x40; /* base command, add OSR offset */
+constexpr uint8_t CMD_CONVERT_D2 = 0x50; /* base command, add OSR offset */
+constexpr uint8_t CMD_PROM_READ  = 0xA0; /* base addr, + (index << 1) */
+
+}  // namespace
 
 // NOLINTBEGIN(cppcoreguidelines-avoid-do-while)
 
@@ -43,9 +52,9 @@ using namespace ms5611_cmd;
     }                       \
     while (0)
 
-/* ═══════════════════════════════════════════════════════════════════════════
- * Error Handling
- * ═══════════════════════════════════════════════════════════════════════════ */
+/* ====================
+ * Handlowanie errorow
+ * ==================== */
 
 void Ms5611::report_error()
 {
@@ -53,9 +62,9 @@ void Ms5611::report_error()
     error_report(ErrorCode::BARO_COMM_FAIL);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
+/* ============
  * SPI Helpers
- * ═══════════════════════════════════════════════════════════════════════════ */
+ * ============= */
 
 bool Ms5611::send_command(uint8_t cmd)
 {
@@ -73,7 +82,7 @@ bool Ms5611::read_adc(uint32_t &result)
      * ADC Read: send 0x00, then clock out 3 bytes (MSB first).
      * Total transfer: 1 cmd byte + 3 data bytes = 4 bytes.
      */
-    uint8_t tx[4] = {ADC_READ, 0x00, 0x00, 0x00};
+    uint8_t tx[4] = {CMD_ADC_READ, 0x00, 0x00, 0x00};
     uint8_t rx[4] = {};
 
     if (!spi_->transfer(cs_line_, tx, rx, 4, *spi_cfg_))
@@ -95,7 +104,7 @@ bool Ms5611::read_prom(uint16_t prom[8])
      */
     for (uint8_t addr = 0; addr < 8; ++addr)
     {
-        uint8_t tx[3] = {static_cast<uint8_t>(PROM_READ + (addr << 1)), 0x00, 0x00};
+        uint8_t tx[3] = {static_cast<uint8_t>(CMD_PROM_READ + (addr << 1)), 0x00, 0x00};
         uint8_t rx[3] = {};
 
         if (!spi_->transfer(cs_line_, tx, rx, 3, *spi_cfg_))
@@ -109,14 +118,14 @@ bool Ms5611::read_prom(uint16_t prom[8])
     return true;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
- * Conversion Time Lookup
- * ═══════════════════════════════════════════════════════════════════════════ */
+/* =======================================
+ * Maskymalny czas konwersji Lookup table
+ * ======================================= */
 
 uint32_t Ms5611::conversion_time_us(Ms5611Osr osr)
 {
     /*
-     * Max conversion times from datasheet (rounded up for safety margin):
+     * Maksymalne czasy konwersji z datasheeta (zaokraglone z marginesem bezpieczenstwa):
      *   OSR 256:   600 µs
      *   OSR 512:  1170 µs
      *   OSR 1024: 2280 µs
@@ -139,9 +148,9 @@ uint32_t Ms5611::conversion_time_us(Ms5611Osr osr)
     }
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
+/* =======================
  * Thread-Safe Accessors
- * ═══════════════════════════════════════════════════════════════════════════ */
+ * ======================= */
 
 bool Ms5611::has_new_data() const
 {
@@ -157,34 +166,35 @@ BaroSample Ms5611::sample()
     return s;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
- * Initialization (blocking — called once at boot)
- * ═══════════════════════════════════════════════════════════════════════════ */
+/* ==================================================================
+ * Inicjalizacja (blokulacja, ale uruchamiana tylko raz przy boocie)
+ * ================================================================== */
 
 bool Ms5611::init(SpiBus &spi, ioline_t cs_line, const SPIConfig &spi_cfg, const Ms5611Config &cfg)
 {
     spi_     = &spi;
     cs_line_ = cs_line;
     spi_cfg_ = &spi_cfg;
-    osr_     = cfg.osr;
-    qnh_pa_  = cfg.qnh_pa;
+    osr_          = cfg.osr;
+    qnh_pa_       = cfg.qnh_pa;
+    conv_time_us_ = conversion_time_us(osr_);
 
     /*
-     * Step 1: Reset.
-     * Loads factory calibration data from PROM into internal registers.
-     * Must wait at least 2.8 ms after reset.
+     * Krok 1: Reset.
+     * Laduje fabryczne dane kalibracyjne z PROM do wewnetrzynych rejestrow
+     * Trzeba czekac co najmniej 2.8 ms po resecie
      */
-    BARO_TRY(send_command(RESET));
+    BARO_TRY(send_command(CMD_RESET));
     chThdSleepMilliseconds(3);
 
     /*
-     * Step 2: Read PROM (8 × 16-bit words).
+     * Krok 2: Odczytaj PROM (8 × 16-bit words).
      */
     uint16_t prom[8] = {};
     BARO_TRY(read_prom(prom));
 
     /*
-     * Step 3: Verify CRC-4.
+     * Step 3: Zweryfikuj CRC-4.
      */
     if (!ms5611::verify_crc4(prom))
     {
@@ -192,7 +202,7 @@ bool Ms5611::init(SpiBus &spi, ioline_t cs_line, const SPIConfig &spi_cfg, const
         return false;
     }
 
-    /* Extract calibration coefficients C1–C6 (PROM addresses 1–6). */
+    /* Wyekstraktuj wspolczynniki kalibracyjne C1–C6 (PROM addresses 1–6). */
     for (int i = 0; i < 6; ++i)
     {
         cal_[i] = prom[i + 1];
@@ -203,9 +213,9 @@ bool Ms5611::init(SpiBus &spi, ioline_t cs_line, const SPIConfig &spi_cfg, const
     return true;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
+/* ========================
  * Compensation + Publish
- * ═══════════════════════════════════════════════════════════════════════════ */
+ * ======================== */
 
 void Ms5611::compute_and_publish()
 {
@@ -225,9 +235,9 @@ void Ms5611::compute_and_publish()
     chSysUnlock();
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
- * Non-Blocking State Machine
- * ═══════════════════════════════════════════════════════════════════════════ */
+/* ============================
+ * Nieblokujaca maszyna stanow
+ * ============================ */
 
 void Ms5611::update()
 {
@@ -240,7 +250,7 @@ void Ms5611::update()
     {
         case State::CONVERT_D1:
         {
-            const uint8_t cmd = CONVERT_D1 + static_cast<uint8_t>(osr_);
+            const uint8_t cmd = CMD_CONVERT_D1 + static_cast<uint8_t>(osr_);
             if (!send_command(cmd))
             {
                 report_error();
@@ -254,7 +264,7 @@ void Ms5611::update()
         case State::WAIT_D1:
         {
             const uint32_t elapsed = timestamp_us() - conv_start_us_;
-            if (elapsed >= conversion_time_us(osr_))
+            if (elapsed >= conv_time_us_)
             {
                 state_ = State::READ_D1;
             }
@@ -266,11 +276,11 @@ void Ms5611::update()
             if (!read_adc(raw_d1_))
             {
                 report_error();
-                state_ = State::CONVERT_D1; /* retry from the start */
+                state_ = State::CONVERT_D1; /* retry od poczatku */
                 return;
             }
 
-            /* Zero ADC result means conversion was not ready or not started. */
+            /* Zero ADC wynik oznacza ze konwersja nie byla gotowa lub sie nie rozpoczela. */
             if (raw_d1_ == 0)
             {
                 state_ = State::CONVERT_D1;
@@ -283,7 +293,7 @@ void Ms5611::update()
 
         case State::CONVERT_D2:
         {
-            const uint8_t cmd = CONVERT_D2 + static_cast<uint8_t>(osr_);
+            const uint8_t cmd = CMD_CONVERT_D2 + static_cast<uint8_t>(osr_);
             if (!send_command(cmd))
             {
                 report_error();
@@ -297,7 +307,7 @@ void Ms5611::update()
         case State::WAIT_D2:
         {
             const uint32_t elapsed = timestamp_us() - conv_start_us_;
-            if (elapsed >= conversion_time_us(osr_))
+            if (elapsed >= conv_time_us_)
             {
                 state_ = State::READ_D2;
             }
@@ -321,7 +331,7 @@ void Ms5611::update()
 
             compute_and_publish();
 
-            /* Loop back to start of next cycle. */
+            /* Zloopbackuj do poczatku nowego cyklu */
             state_ = State::CONVERT_D1;
             break;
         }

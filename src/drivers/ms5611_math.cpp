@@ -6,6 +6,7 @@
 
 #include "drivers/ms5611_math.h"
 
+#include <algorithm>
 #include <cmath>
 
 namespace acs::ms5611
@@ -22,10 +23,7 @@ bool verify_crc4(const uint16_t prom[8])
 
     /* Work on a copy — the algorithm modifies prom[0] and prom[7]. */
     uint16_t work[8];
-    for (int i = 0; i < 8; ++i)
-    {
-        work[i] = prom[i];
-    }
+    std::copy(prom, prom + 8, work);
 
     work[7] &= 0xFF00; /* CRC byte is replaced by 0 */
 
