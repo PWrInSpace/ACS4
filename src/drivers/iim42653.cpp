@@ -1,17 +1,16 @@
 /*
- * ACS4 Flight Computer — IIM-42653 IMU Driver (Implementation)
+ * ACS4 Flight Computer — IIM-42653 IMU Driver
  *
  * TDK InvenSense IIM-42653 6-axis IMU.
- * See iim42653.h for API documentation.
  *
- * Init sequence follows the recommended power-up procedure from the
- * IIM-42653 datasheet, with specific timing constraints:
- *   - 1 ms after soft reset
- *   - 200 µs after sensor enable in PWR_MGMT0
- *   - 45 ms minimum gyro startup time (PWR_MGMT0 register spec)
- *   - INT_ASYNC_RESET must be cleared in INT_CONFIG1
+ * Sekwencja inicjalizacji jest zgodna z uwzglednieniem constraintsow
+ * czasowych czyli:
+ *   - 1 ms po soft resecie
+ *   - 200 mikrosekund po wlaczeniu czujnikow rejestrze PWR_MGMT0
+ *   - 45 ms minimum czasu startu zyroskopu (specyfikacja rejestru PWR_MGMT0)
+ *   - INT_ASYNC_RESET musi zostac wyczyszczony w rejestrze INT_CONFIG1
  *
- * All bus access goes through the SpiBus abstraction (DMA, mutex-protected).
+ * Cala komunikacja z magistrala idzie przez abstrakcje SpiBus
  */
 
 #include "drivers/iim42653.h"
@@ -35,7 +34,7 @@ using namespace iim42653_reg;
 
 // NOLINTBEGIN(cppcoreguidelines-avoid-do-while)
 
-/** Write-or-fail: calls report_error() and returns false on SPI failure. */
+/** Write-or-fail: wywoluje report_error() i zwraca false w przypadku bledu SPI. */
 #define IMU_TRY(expr)       \
     do                      \
     {                       \
@@ -47,16 +46,16 @@ using namespace iim42653_reg;
     }                       \
     while (0)
 
-/* ═══════════════════════════════════════════════════════════════════════════
- * Byte Parsing
- * ═══════════════════════════════════════════════════════════════════════════ */
+/* ==================
+ * Parsowanie bajtow
+ * ================== */
 
 static constexpr int16_t parse_be16(const uint8_t *p)
 {
     return static_cast<int16_t>(static_cast<uint16_t>(p[0]) << 8 | p[1]);
 }
 
-/** Raw value 0x8000 (−32768) indicates sensor data is not ready. */
+/** Raw value 0x8000 (−32768) oznacza ze dane z czujnika nie sa jeszcze gotowe. */
 static constexpr int16_t kInvalidRaw = -32768;
 
 bool Iim42653::has_invalid(const int16_t data[3])
@@ -75,9 +74,9 @@ void Iim42653::convert_inertial(const int16_t accel[3],
     }
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
- * Register Access Helpers
- * ═══════════════════════════════════════════════════════════════════════════ */
+/* ========================
+ * Helpery do rejestrow
+ * ======================== */
 
 bool Iim42653::write_reg(uint8_t reg, uint8_t value)
 {
@@ -119,7 +118,7 @@ bool Iim42653::write_bank_reg(uint8_t bank, uint8_t reg, uint8_t value)
 
     const bool ok = write_reg(reg, value);
 
-    /* Always return to bank 0. */
+    /* Zawsze wracaj do bank 0. */
     (void)select_bank(0);
 
     return ok;
@@ -134,7 +133,7 @@ std::optional<uint8_t> Iim42653::read_bank_reg(uint8_t bank, uint8_t reg)
 
     auto val = read_reg(reg);
 
-    /* Always return to bank 0. */
+    /* Zawsze wracaj do bank 0. */
     (void)select_bank(0);
 
     return val;
@@ -160,15 +159,15 @@ bool Iim42653::modify_bank_reg(uint8_t bank, uint8_t reg, uint8_t clear_mask, ui
 
     const bool ok = modify_reg(reg, clear_mask, set_mask);
 
-    /* Always return to bank 0. */
+    /* Zawsze wracaj do bank 0. */
     (void)select_bank(0);
 
     return ok;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
- * Error Handling
- * ═══════════════════════════════════════════════════════════════════════════ */
+/* ====================
+ * Handlowanie errorow
+ * ==================== */
 
 void Iim42653::report_error()
 {
@@ -176,9 +175,9 @@ void Iim42653::report_error()
     error_report(ErrorCode::IMU_COMM_FAIL);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
- * Scale Factor Computation
- * ═══════════════════════════════════════════════════════════════════════════ */
+/* ========================
+ * Wspolczynniki skalowania
+ * ======================== */
 
 float Iim42653::gyro_sensitivity(GyroFsr fsr)
 {
@@ -199,16 +198,16 @@ float Iim42653::accel_sensitivity(AccelFsr fsr)
 void Iim42653::compute_scale_factors()
 {
     /*
-     * Gyro:  raw / sensitivity_lsb_per_dps * (π/180) = rad/s
-     * Accel: raw / sensitivity_lsb_per_g * 9.80665 = m/s²
+     * Gyro:  raw / sensitivity_lsb_per_dps * (pi/180) = rad/s
+     * Accel: raw / sensitivity_lsb_per_g * 9.80665 = m/s^2
      */
     gyro_scale_  = kDeg2Rad / gyro_sensitivity(config_.gyro_fsr);
     accel_scale_ = kGravity / accel_sensitivity(config_.accel_fsr);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
- * Initialization
- * ═══════════════════════════════════════════════════════════════════════════ */
+/* =======================
+ * Inicjalizacja czujnika
+ * ======================= */
 
 bool Iim42653::init(SpiBus &spi, ioline_t cs_line, const SPIConfig &spi_cfg)
 {
@@ -218,16 +217,16 @@ bool Iim42653::init(SpiBus &spi, ioline_t cs_line, const SPIConfig &spi_cfg)
     current_bank_ = 0;
 
     /*
-     * Step 1: Soft reset.
-     * Write SOFT_RESET_CONFIG = 1 to DEVICE_CONFIG (0x11).
-     * Wait 1 ms for reset to complete.
+     * Krok 1: Soft reset.
+     * Zapisac SOFT_RESET_CONFIG = 1 do DEVICE_CONFIG (0x11).
+     * Poczekac 1 ms na zakonczenie resetu.
      */
     IMU_TRY(write_reg(DEVICE_CONFIG, SOFT_RESET_EN));
     chThdSleepMilliseconds(2);
 
     /*
-     * Step 2: Verify WHO_AM_I.
-     * Expected: 0x56 for IIM-42653.
+     * Krok 2: Zweryfikowac WHO_AM_I.
+     * Zwrocona wartosc powinna byc: 0x56 dla IIM-42653.
      */
     auto who = read_reg(WHO_AM_I);
     if (!who.has_value() || who.value() != WHO_AM_I_VALUE)
@@ -237,7 +236,7 @@ bool Iim42653::init(SpiBus &spi, ioline_t cs_line, const SPIConfig &spi_cfg)
     }
 
     /*
-     * Step 3-7: Interface configuration, clock, SPI, I3C.
+     * Krok 3-7: Skonfiguruj interfejsy, zegar, SPI, I3C.
      */
     if (!configure_interface())
     {
@@ -250,29 +249,29 @@ bool Iim42653::init(SpiBus &spi, ioline_t cs_line, const SPIConfig &spi_cfg)
 
 bool Iim42653::configure_interface()
 {
-    /* Clear INT_ASYNC_RESET (bit 4) in INT_CONFIG1. */
+    /* Wyczysc INT_ASYNC_RESET (bit 4) w INT_CONFIG1. */
     IMU_TRY(modify_reg(INT_CONFIG1, INT_ASYNC_RESET_BIT, 0x00));
 
-    /* Interface configuration: big-endian, FIFO count in bytes, SPI 4-wire,
-     * disable I2C/I3C slave interface (UI_SIFS_CFG = 0b11). */
+    /* Konfiguracja interfejsow: big-endian, licznik FIFO w bajtach, SPI 4-wire,
+     * wylacz I2C/I3C slave interfejs (UI_SIFS_CFG = 0b11). */
     IMU_TRY(write_reg(INTF_CONFIG0, INTF0_BIGENDIAN_SPI_ONLY));
 
-    /* Clock source — PLL auto-select (CLKSEL = 01). */
+    /* Zrodlo zegara — PLL auto-select (CLKSEL = 01). */
     IMU_TRY(modify_reg(INTF_CONFIG1, CLKSEL_MASK, CLKSEL_PLL_AUTO));
 
-    /* SPI slew rate configuration. */
+    /* Konfiguracja SPI slew rate. */
     IMU_TRY(write_reg(DRIVE_CONFIG, SPI_SLEW_DEFAULT));
 
-    /* Disable I3C for clean SPI-only operation.
-     * Reset value is 0x5F — preserve reserved bit 6, clear I3C bits [4:0]. */
+    /* Trzeba wylaczyc I3C by pracowalo jedynie SPI.
+     * Wartosc resetu to 0x5F — trzeba zachowac zarezerwowany 6 bit i wyczysic I3C bits [4:0]. */
     IMU_TRY(modify_bank_reg(1, INTF_CONFIG6, I3C_EN_MASK, 0x00));
 
     return true;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
- * Configuration
- * ═══════════════════════════════════════════════════════════════════════════ */
+/* ===============
+ * Konfiguracja
+ * =============== */
 
 bool Iim42653::configure(const Iim42653Config &cfg)
 {
@@ -284,7 +283,7 @@ bool Iim42653::configure(const Iim42653Config &cfg)
     config_ = cfg;
     compute_scale_factors();
 
-    /* Ensure sensors are off before configuration. */
+    /* Musimy sprawdzic czy czujniki sa wylaczone przed configiem. */
     IMU_TRY(write_reg(PWR_MGMT0, PWR_OFF));
     chThdSleepMicroseconds(300);
 
@@ -318,10 +317,10 @@ bool Iim42653::configure(const Iim42653Config &cfg)
         return false;
     }
 
-    /* Enable sensors: gyro + accel in Low Noise mode, temperature on. */
+    /* Wlaczamy czujniki: gyro i accel w trybie low noise, temperatura wlaczona. */
     IMU_TRY(write_reg(PWR_MGMT0, PWR_GYRO_ACCEL_LN));
 
-    /* Wait for gyro startup (45 ms datasheet minimum) + margin. */
+    /* Czekamy na startup gyro (w datasheecie 45 ms minimum) + maly zapas czasu. */
     chThdSleepMilliseconds(50);
 
     return true;
@@ -352,7 +351,9 @@ bool Iim42653::configure_ui_filters(const Iim42653Config &cfg)
                            | (static_cast<uint8_t>(cfg.gyro_filter_order) << 2)));
 
     /* ACCEL_CONFIG1: [4:3] = ACCEL_UI_FILT_ORD. */
-    IMU_TRY(modify_reg(ACCEL_CONFIG1, ACCEL_CFG1_FILT_ORD_MASK, static_cast<uint8_t>(cfg.accel_filter_order) << 3));
+    IMU_TRY(modify_reg(ACCEL_CONFIG1,
+                       ACCEL_CFG1_FILT_ORD_MASK,
+                       static_cast<uint8_t>(cfg.accel_filter_order) << 3));
 
     /* GYRO_ACCEL_CONFIG0: [7:4] = accel BW, [3:0] = gyro BW. */
     const uint8_t filter_bw =
@@ -365,7 +366,8 @@ bool Iim42653::configure_ui_filters(const Iim42653Config &cfg)
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
 bool Iim42653::configure_aaf(const Iim42653Config &cfg)
 {
-    /* Gyro AAF — Bank 1 (single bank switch for all gyro AAF registers). */
+    /* Gyro AAF - Bank 1 (do wszystkich rejestrow gyro AAF musimy zrobic pojedynczego bank switcha).
+     */
     {
         const BankScope bank(*this, 1);
         if (!bank)
@@ -383,17 +385,17 @@ bool Iim42653::configure_aaf(const Iim42653Config &cfg)
                               static_cast<uint8_t>((cfg.gyro_aaf.bitshift << 4)
                                                    | ((cfg.gyro_aaf.deltsqr >> 8) & 0x0F))));
 
-            /* Enable gyro AAF (clear GYRO_AAF_DIS bit 1). */
+            /* Wlacz gyro AAF (wyczysc GYRO_AAF_DIS bit 1). */
             IMU_TRY(modify_reg(GYRO_CONFIG_STATIC2, GYRO_AAF_DIS, 0x00));
         }
         else
         {
-            /* Explicitly disable gyro AAF (set GYRO_AAF_DIS bit 1). */
+            /* Jawnie wylacz gyro AAF (ustaw GYRO_AAF_DIS bit 1). */
             IMU_TRY(modify_reg(GYRO_CONFIG_STATIC2, 0x00, GYRO_AAF_DIS));
         }
     }
 
-    /* Accel AAF — Bank 2 (single bank switch for all accel AAF registers). */
+    /* Accel AAF - Bank 2 (Jedno przelaczeniu banku dla wszystkich rejestrow accel AAF). */
     {
         const BankScope bank(*this, 2);
         if (!bank)
@@ -404,7 +406,7 @@ bool Iim42653::configure_aaf(const Iim42653Config &cfg)
 
         if (cfg.accel_aaf.is_enabled())
         {
-            /* ACCEL_CONFIG_STATIC2: [6:1] = DELT, bit 0 = AAF_DIS = 0 (enabled). */
+            /* ACCEL_CONFIG_STATIC2: [6:1] = DELT, bit 0 = AAF_DIS = 0 (wlaczone). */
             IMU_TRY(write_reg(ACCEL_CONFIG_STATIC2,
                               static_cast<uint8_t>((cfg.accel_aaf.delt & 0x3F) << 1)));
             IMU_TRY(write_reg(ACCEL_CONFIG_STATIC3,
@@ -415,7 +417,7 @@ bool Iim42653::configure_aaf(const Iim42653Config &cfg)
         }
         else
         {
-            /* Explicitly disable accel AAF (set ACCEL_AAF_DIS bit 0). */
+            /* Jawnie wylacz accel AAF (ustaw ACCEL_AAF_DIS bit 0). */
             IMU_TRY(modify_reg(ACCEL_CONFIG_STATIC2, 0x00, ACCEL_AAF_DIS));
         }
     }
@@ -428,14 +430,14 @@ bool Iim42653::configure_notch_filter(const Iim42653Config &cfg)
 {
     if (!cfg.gyro_notch.is_enabled())
     {
-        /* Ensure notch filter is disabled (set GYRO_NF_DIS = bit 0). */
+        /* Upewnij sie ze gyro notch filter jest wylaczony (ustaw GYRO_NF_DIS = bit 0). */
         IMU_TRY(modify_bank_reg(1, GYRO_CONFIG_STATIC2, 0x00, GYRO_NF_DIS));
         return true;
     }
 
     /*
-     * Compute NF_COSWZ and NF_COSWZ_SEL per datasheet §5.2.1.
-     * fdesired is in Hz, formula uses kHz: cos(2π·f_kHz/8).
+     * Obliczamy NF_COSWZ and NF_COSWZ_SEL zgodnie z datasheetem (patrz 5.2.1 w datasheet).
+     * fdesired podane jest w Hz, a we wzorze sa kHz: cos(2pi·f_kHz/8).
      */
     const float f_khz = cfg.gyro_notch.freq_hz / 1000.0f;
     const float coswz = std::cos(2.0f * kPi * f_khz / 8.0f);
@@ -461,7 +463,7 @@ bool Iim42653::configure_notch_filter(const Iim42653Config &cfg)
         }
     }
 
-    /* Encode as unsigned 9-bit value for register packing. */
+    /* Musimy to zakodowac jako 9-bitowa wartosc bez znaku do zapisania w rejestrach */
     const auto coswz_u9  = static_cast<uint16_t>(nf_coswz_raw & 0x01FF);
     const auto coswz_low = static_cast<uint8_t>(coswz_u9 & 0xFF);
     const auto coswz_hi  = static_cast<uint8_t>((coswz_u9 >> 8) & 0x01);
@@ -478,7 +480,7 @@ bool Iim42653::configure_notch_filter(const Iim42653Config &cfg)
     const uint8_t static9 = (coswz_hi << 0) | (coswz_hi << 1) | (coswz_hi << 2)
                             | (nf_coswz_sel << 3) | (nf_coswz_sel << 4) | (nf_coswz_sel << 5);
 
-    /* Program all notch filter registers in a single bank 1 session. */
+    /* Zapisz wszystkie rejestry filtra notch w jednej sesji banku 1 */
     {
         const BankScope bank(*this, 1);
         if (!bank)
@@ -487,17 +489,18 @@ bool Iim42653::configure_notch_filter(const Iim42653Config &cfg)
             return false;
         }
 
-        /* Same frequency for all 3 axes. */
+        /* Ta sama czestotliwosc dla wszystkich 3 osi */
         IMU_TRY(write_reg(GYRO_CONFIG_STATIC6, coswz_low));
         IMU_TRY(write_reg(GYRO_CONFIG_STATIC7, coswz_low));
         IMU_TRY(write_reg(GYRO_CONFIG_STATIC8, coswz_low));
         IMU_TRY(write_reg(GYRO_CONFIG_STATIC9, static9));
 
         /* GYRO_CONFIG_STATIC10 (0x13): [6:4] = NF_BW_SEL. */
-        IMU_TRY(
-            modify_reg(GYRO_CONFIG_STATIC10, NF_BW_SEL_MASK, static_cast<uint8_t>(cfg.gyro_notch.bw) << 4));
+        IMU_TRY(modify_reg(GYRO_CONFIG_STATIC10,
+                           NF_BW_SEL_MASK,
+                           static_cast<uint8_t>(cfg.gyro_notch.bw) << 4));
 
-        /* Enable notch filter: clear GYRO_NF_DIS (bit 0) in GYRO_CONFIG_STATIC2. */
+        /* Wlacz notch filter: clear GYRO_NF_DIS (bit 0) w GYRO_CONFIG_STATIC2. */
         IMU_TRY(modify_reg(GYRO_CONFIG_STATIC2, GYRO_NF_DIS, 0x00));
     }
 
@@ -517,13 +520,13 @@ bool Iim42653::configure_interrupts(const Iim42653Config &cfg)
 
     if (cfg.enable_fifo)
     {
-        /* FIFO mode: route FIFO_THS (watermark) to INT1. */
+        /* FIFO mode: skieruj przerwanie FIFO_THS (watermark) na INT1. */
         IMU_TRY(write_reg(INT_CONFIG0, INT_CFG0_FIFO_MODE));
         IMU_TRY(write_reg(INT_SOURCE0, FIFO_THS_INT1_EN));
     }
     else
     {
-        /* Register-read mode: DRDY interrupt on INT1. */
+        /* Register-read mode: przerwanie DRDY na INT1. */
         IMU_TRY(write_reg(INT_CONFIG0, INT_CFG0_DRDY_MODE));
         IMU_TRY(write_reg(INT_SOURCE0, UI_DRDY_INT1_EN));
     }
@@ -531,9 +534,9 @@ bool Iim42653::configure_interrupts(const Iim42653Config &cfg)
     return true;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════
+/* ===================
  * FIFO Configuration
- * ═══════════════════════════════════════════════════════════════════════ */
+ * =================== */
 
 // NOLINTNEXTLINE(readability-function-cognitive-complexity)
 bool Iim42653::configure_fifo(const Iim42653Config &cfg)
@@ -545,29 +548,29 @@ bool Iim42653::configure_fifo(const Iim42653Config &cfg)
         return true;
     }
 
-    /* FIFO in bypass during configuration. */
+    /* FIFO w trybie bypass podczas konfiguracji */
     IMU_TRY(write_reg(FIFO_CONFIG, FIFO_BYPASS));
 
     /*
-     * TMST_CONFIG = 0x21: TMST_EN=1, FSYNC_EN=0, 1 µs resolution.
-     * Overwrites reset value 0x23 (clears TMST_FSYNC_EN at bit 1).
+     * TMST_CONFIG = 0x21: TMST_EN=1, FSYNC_EN=0, rozdzielczosc 1 mikrosekunda.
+     * Nadpisuje wartosc po resecie 0x23 (czysci  bit TMST_FSYNC_EN, bit 1).
      */
     IMU_TRY(write_reg(TMST_CONFIG, TMST_EN_1US));
 
     /*
      * FIFO_CONFIG1 = 0x2F:
      *   bit 5 = FIFO_WM_GT_TH
-     *   bit 3 = FIFO_TMST_FSYNC_EN  (required for ODR timestamps)
+     *   bit 3 = FIFO_TMST_FSYNC_EN  (wymagane do ODR timestamps)
      *   bit 2 = FIFO_TEMP_EN
      *   bit 1 = FIFO_GYRO_EN
      *   bit 0 = FIFO_ACCEL_EN
-     * Produces Packet 3 (16 B): Header + Accel + Gyro + Temp8 + Timestamp16.
+     * Generuje Packet 3 (16 B): Header + Accel + Gyro + Temp8 + Timestamp16.
      */
     IMU_TRY(write_reg(FIFO_CONFIG1, FIFO1_PKT3_ALL));
 
-    /* Watermark in bytes. Clamp to hardware max (2080 B / 16 B = 130 packets).
-     * Datasheet §6.3: physical FIFO = 2048 B + read cache, driver max = 2080 B.
-     * FIFO_WM must not be 0 (register spec §14.48/14.49). */
+    /* Watermark w bajtach. Musimy ograniczyc do maksymalnej wartosci sprzetowej (2080 B / 16 B =
+     * 130 pakietow). Datasheet w 6.3 mowi: physical FIFO = 2048 B + read cache, driver max = 2080
+     * B. FIFO_WM nie moze byc rowne 0 (patrz datasheet w 14.48/14.49). */
     uint16_t wm_packets = (cfg.fifo_watermark > 0) ? cfg.fifo_watermark : 1;
     if (wm_packets > kFifoMaxPackets)
     {
@@ -578,7 +581,7 @@ bool Iim42653::configure_fifo(const Iim42653Config &cfg)
     IMU_TRY(write_reg(FIFO_CONFIG2, static_cast<uint8_t>(wm_bytes & 0xFF)));
     IMU_TRY(write_reg(FIFO_CONFIG3, static_cast<uint8_t>((wm_bytes >> 8) & 0x0F)));
 
-    /* Flush FIFO (SIGNAL_PATH_RESET bit 1). */
+    /* sflushuj FIFO (SIGNAL_PATH_RESET bit 1). */
     IMU_TRY(modify_reg(SIGNAL_PATH_RESET, 0x00, FIFO_FLUSH));
 
     chThdSleepMicroseconds(100);
@@ -590,9 +593,9 @@ bool Iim42653::configure_fifo(const Iim42653Config &cfg)
     return true;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
- * Data Read
- * ═══════════════════════════════════════════════════════════════════════════ */
+/* ===============
+ * Odczyt danych
+ * =============== */
 
 bool Iim42653::read(ImuSample &sample)
 {
@@ -602,12 +605,12 @@ bool Iim42653::read(ImuSample &sample)
     }
 
     /*
-     * Timestamp at start of read for accurate timing.
+     * Pobieranie timestampa na poczatku by jak najlepiej okreslic moment pomiaru.
      */
     sample.timestamp_us = timestamp_us();
 
     /*
-     * Burst read 14 bytes: TEMP_DATA1 (0x1D) through GYRO_DATA_Z0 (0x2A).
+     * Burstowo odczytujemy 14 bajtow: TEMP_DATA1 (0x1D) do GYRO_DATA_Z0 (0x2A).
      *
      * Layout (big-endian):
      *   [0]  TEMP_DATA1  (high byte)
@@ -633,21 +636,22 @@ bool Iim42653::read(ImuSample &sample)
         return false;
     }
 
-    /* Parse big-endian 16-bit signed values. */
+    /* Parsujemy big-endian 16-bitowe signed inty */
     const int16_t raw_temp     = parse_be16(&buf[0]);
     const int16_t raw_accel[3] = {parse_be16(&buf[2]), parse_be16(&buf[4]), parse_be16(&buf[6])};
     const int16_t raw_gyro[3]  = {parse_be16(&buf[8]), parse_be16(&buf[10]), parse_be16(&buf[12])};
 
-    /* Reject sample if any accel/gyro axis reports invalid data (0x8000). */
+    /* Odrzucamy probke jezeli ktorakolwiek os gyro i akcelerometru zwraca nieprawidlowa wartosc
+     * (0x8000). */
     if (has_invalid(raw_accel) || has_invalid(raw_gyro))
     {
         return false;
     }
 
-    /* Convert inertial channels to SI units. */
+    /* Konwertujemy inertial channels do jednostek SI. */
     convert_inertial(raw_accel, raw_gyro, sample);
 
-    /* Temperature: T(°C) = raw / 132.48 + 25. NaN if sensor data not ready. */
+    /* Temperatura: T(deg_C) = raw / 132.48 + 25. NaN jezeli dane z czujnika nie sa gotowe. */
     sample.temp_degc = (raw_temp == kInvalidRaw)
                            ? std::numeric_limits<float>::quiet_NaN()
                            : static_cast<float>(raw_temp) * kTempScale + kTempOffset;
@@ -655,9 +659,9 @@ bool Iim42653::read(ImuSample &sample)
     return true;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
- * Data Ready Check
- * ═══════════════════════════════════════════════════════════════════════════ */
+/* ============================
+ * Sprawdzanie gotowosci danych
+ * ============================ */
 
 bool Iim42653::data_ready()
 {
@@ -668,20 +672,20 @@ bool Iim42653::data_ready()
         return false;
     }
 
-    /* DATA_RDY_INT is bit 3 of INT_STATUS (0x2D). */
+    /* DATA_RDY_INT to bit 3 INT_STATUS (0x2D). */
     return (status.value() & DATA_RDY_INT) != 0;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
- * FIFO Read
- * ═══════════════════════════════════════════════════════════════════════════ */
+/* ================
+ * Odczyt FIFO
+ * ================ */
 
 int16_t Iim42653::fifo_byte_count()
 {
     /*
-     * Burst-read FIFO_COUNTH (0x2E) and FIFO_COUNTL (0x2F).
-     * Reading FIFO_COUNTL latches both registers for a consistent value.
-     * INTF_CONFIG0 bit 5 = 1 → big-endian byte order.
+     * Burst-read FIFO_COUNTH (0x2E) i FIFO_COUNTL (0x2F).
+     * Czytanie FIFO_COUNTL zatrzaskuje oba rejestry dla spojnej wartosci.
+     * INTF_CONFIG0 bit 5 = 1 -> kolejnosc bajtow big-endian.
      */
     uint8_t buf[2];
     if (!read_regs(FIFO_COUNTH, buf, 2))
@@ -708,7 +712,7 @@ bool Iim42653::parse_fifo_packet(const uint8_t *pkt, ImuSample &sample) const
      */
     const uint8_t header = pkt[0];
 
-    /* Check FIFO-empty flag. */
+    /* sprawdz FIFO-flag czy pusta. */
     if ((header & kFifoHeaderEmpty) != 0)
     {
         return false;
@@ -723,16 +727,17 @@ bool Iim42653::parse_fifo_packet(const uint8_t *pkt, ImuSample &sample) const
     const int16_t raw_accel[3] = {parse_be16(&pkt[1]), parse_be16(&pkt[3]), parse_be16(&pkt[5])};
     const int16_t raw_gyro[3]  = {parse_be16(&pkt[7]), parse_be16(&pkt[9]), parse_be16(&pkt[11])};
 
-    /* Reject sample if any axis reports invalid data (0x8000). */
+    /* Odrzucamy probke jezeli ktorakolwiek os gyro i akcelerometru zwraca nieprawidlowa wartosc
+     * (0x8000). */
     if (has_invalid(raw_accel) || has_invalid(raw_gyro))
     {
         return false;
     }
 
-    /* Convert to SI units (same formula as register-read path). */
+    /* skonwertuj do SI units (taki sam wzor jak dla register-read path). */
     convert_inertial(raw_accel, raw_gyro, sample);
 
-    /* 8-bit FIFO temperature: T(°C) = raw / 2.07 + 25, range -40 to 85°C. */
+    /* 8-bit FIFO temperature: T(deg_C) = raw / 2.07 + 25, range -40 to 85deg_C. */
     const auto raw_temp = static_cast<int8_t>(pkt[13]);
     if (raw_temp == kFifoTempInvalid)
     {
@@ -743,8 +748,8 @@ bool Iim42653::parse_fifo_packet(const uint8_t *pkt, ImuSample &sample) const
         sample.temp_degc = static_cast<float>(raw_temp) * kFifoTempScale + kFifoTempOffset;
     }
 
-    /* Sensor timestamp stored temporarily in timestamp_us (raw 16-bit µs).
-     * The caller (read_fifo) reconstructs absolute host timestamps. */
+    /* timestamp czujnika zapisany tymczasowo w timestamp_us (raw 16-bit mikrosekund).
+     * Caller (read_fifo) rekonstruuje absolutne znaczniki czasu hosta. */
     sample.timestamp_us = static_cast<uint32_t>(parse_be16(&pkt[14]) & 0xFFFF);
 
     return true;
@@ -823,22 +828,24 @@ size_t Iim42653::read_fifo(ImuSample *samples, size_t max_count)
     }
 
     /*
-     * Reconstruct absolute host timestamps from sensor-side deltas.
+     * Rekonstruujemy absolutne znaczniki czasu hosta na podstawie roznic timestampow po stronie
+     * czujnika.
      *
-     * Each sample.timestamp_us currently holds the raw 16-bit sensor
-     * timestamp (µs, wrapping at 65536). The newest sample (last valid)
-     * gets the host DWT time. Earlier samples are offset backward by
-     * the inter-sample sensor timestamp deltas.
+     * Kazdy sample.timestamp_us zawiera obecnie raw 16-bit czujnik
+     * timestamp (mikrosekundy, przepelnienie przy 65536). Najnowsza probka (ostatnia poprawna)
+     * otrzymuje czas hosta z licznika DWT. Wczesniejsze probki sa przesuwane wstecz o roznice
+     * timestampow miedzy kolejnymi probkami czujnika.
      *
-     * Unsigned 16-bit subtraction handles single wraparound correctly
-     * as long as consecutive samples are < 65.5 ms apart (ODR ≥ ~16 Hz).
+     * Odejmowanie bez znaku dla 16 bitow poprawnie obsluguje pojedyncze przepelnienie,
+     * o ile odstep miedzy kolejnymi probkami jest mniejszy niz 65.5 ms (ODR >= ok. 16 Hz).
      *
-     * Raw deltas must be scaled by 32/30 (datasheet §12.7): without
-     * external CLKIN and TMST_RES=0, the sensor's internal 1 µs
-     * counter runs at 30/32 of true speed.
+     * Surowe roznice musza zostac przeskalowane przez 32/30 (patrz datasheet 12.7)
+     * bez zewnetrzenego CLKIN oraz przy TMST_RES=0 wewnetrzny licznik 1 mikrosekundy w czujniku
+     * dziala z predkoscia 30/32 rzeczywistego czasu.
      *
-     * Raw sensor timestamps must be saved before overwriting with host
-     * timestamps, since the reconstruction mixes both clock domains.
+     * Surowe timestampy czujnika musza zostac zapisane przed ich nadpisanie czasem hosta,
+     * poniewaz rekonstrukja wykorzystuje jednoczesnie oba zrodla zegara
+     *
      */
     for (size_t i = 0; i < valid; ++i)
     {
@@ -869,9 +876,9 @@ bool Iim42653::flush_fifo()
     return true;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
- * Hardware Offset Calibration
- * ═══════════════════════════════════════════════════════════════════════════ */
+/* ============================
+ * Sprzetowa kalibracja offsetow
+ * ============================ */
 
 bool Iim42653::set_offsets(const float gyro_bias_dps[3], const float accel_bias_g[3])
 {
@@ -880,7 +887,8 @@ bool Iim42653::set_offsets(const float gyro_bias_dps[3], const float accel_bias_
         return false;
     }
 
-    /* Verify sensors are OFF — offsets must be programmed before PWR_MGMT0 enables them. */
+    /* Sprawdz, czy czujniki sa WYLACZONE - offsety musza byc ustawione przed ich wlaczeniem
+    przez rejestr PWR_MGMT0. */
     auto pwr = read_reg(PWR_MGMT0);
     if (!pwr.has_value())
     {
@@ -967,9 +975,9 @@ bool Iim42653::set_offsets(const float gyro_bias_dps[3], const float accel_bias_
     return true;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
- * Raw Data Read (for self-test)
- * ═══════════════════════════════════════════════════════════════════════════ */
+/* ========================================
+ * Odczytaj surowe wartosci (for self-test)
+ * ========================================*/
 
 bool Iim42653::read_raw(int16_t accel[3], int16_t gyro[3])
 {
@@ -991,9 +999,9 @@ bool Iim42653::read_raw(int16_t accel[3], int16_t gyro[3])
     return true;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
+/* ==========
  * Self-Test
- * ═══════════════════════════════════════════════════════════════════════════ */
+ * ========== */
 
 // NOLINTNEXTLINE(readability-function-size)
 bool Iim42653::self_test()
@@ -1099,7 +1107,7 @@ bool Iim42653::setup_self_test_mode()
 
     chThdSleepMicroseconds(300);
 
-    /* Gyro: ±250 dps, 1 kHz. Accel: ±4 g, 1 kHz (per datasheet). */
+    /* Gyro: ±250 dps, 1 kHz. Accel: ±4 g, 1 kHz (patrz datasheet). */
     if (!write_reg(GYRO_CONFIG0,
                    static_cast<uint8_t>(GyroFsr::DPS_250) | static_cast<uint8_t>(GyroOdr::HZ_1000)))
     {

@@ -37,9 +37,9 @@
 namespace acs
 {
 
-/* ═══════════════════════════════════════════════════════════════════════════
+/* ====================================================
  * ImuSample — output data structure posted to mailbox
- * ═══════════════════════════════════════════════════════════════════════════ */
+ * ==================================================== */
 
 struct ImuSample
 {
@@ -49,14 +49,14 @@ struct ImuSample
     uint32_t timestamp_us;  /* host µs — DWT (register) or reconstructed (FIFO) */
 };
 
-/* ═══════════════════════════════════════════════════════════════════════════
+/* ======================
  * IIM-42653 Register Map
- * ═══════════════════════════════════════════════════════════════════════════ */
+ * ======================= */
 
 namespace iim42653_reg
 {
 
-/* ── Bank 0 (default) ──────────────────────────────────────────────────── */
+/* BANK 0 (default) */
 
 inline constexpr uint8_t DEVICE_CONFIG      = 0x11;
 inline constexpr uint8_t DRIVE_CONFIG       = 0x13;
@@ -102,7 +102,7 @@ inline constexpr uint8_t SELF_TEST_CONFIG   = 0x70;
 inline constexpr uint8_t WHO_AM_I           = 0x75;
 inline constexpr uint8_t REG_BANK_SEL       = 0x76;
 
-/* ── Bank 1 ────────────────────────────────────────────────────────────── */
+/* BANK 1 */
 
 inline constexpr uint8_t SENSOR_CONFIG0       = 0x03; /* Bank 1 */
 inline constexpr uint8_t GYRO_CONFIG_STATIC2  = 0x0B; /* Bank 1 */
@@ -121,7 +121,7 @@ inline constexpr uint8_t INTF_CONFIG4         = 0x7A; /* Bank 1 */
 inline constexpr uint8_t INTF_CONFIG5         = 0x7B; /* Bank 1 */
 inline constexpr uint8_t INTF_CONFIG6         = 0x7C; /* Bank 1 */
 
-/* ── Bank 2 ────────────────────────────────────────────────────────────── */
+/* BANK 2 */
 
 inline constexpr uint8_t ACCEL_CONFIG_STATIC2 = 0x03; /* Bank 2 */
 inline constexpr uint8_t ACCEL_CONFIG_STATIC3 = 0x04; /* Bank 2 */
@@ -130,7 +130,7 @@ inline constexpr uint8_t XA_ST_DATA           = 0x3B; /* Bank 2 */
 inline constexpr uint8_t YA_ST_DATA           = 0x3C; /* Bank 2 */
 inline constexpr uint8_t ZA_ST_DATA           = 0x3D; /* Bank 2 */
 
-/* ── Bank 4 ────────────────────────────────────────────────────────────── */
+/* BANK 4 */
 
 inline constexpr uint8_t OFFSET_USER0 = 0x77; /* Bank 4 — gyro X low[7:0] */
 inline constexpr uint8_t OFFSET_USER1 = 0x78; /* Bank 4 — gyro X hi[3:0] | gyro Y hi[7:4] */
@@ -142,7 +142,7 @@ inline constexpr uint8_t OFFSET_USER6 = 0x7D; /* Bank 4 — accel Y low[7:0] */
 inline constexpr uint8_t OFFSET_USER7 = 0x7E; /* Bank 4 — accel Y hi[3:0] | accel Z hi[7:4] */
 inline constexpr uint8_t OFFSET_USER8 = 0x7F; /* Bank 4 — accel Z low[7:0] */
 
-/* ── Register Field Values ─────────────────────────────────────────────── */
+/* Wartosci rejestrow */
 
 /* DEVICE_CONFIG (0x11) */
 inline constexpr uint8_t SOFT_RESET_EN = 0x01;
@@ -206,7 +206,7 @@ inline constexpr uint8_t ST_DISABLE    = 0x00;
 /* WHO_AM_I (0x75) */
 inline constexpr uint8_t WHO_AM_I_VALUE = 0x56;
 
-/* ── Bank 1 Field Values ──────────────────────────────────────────────── */
+/* Wartosci rejestrow w BANK 1 */
 
 /* GYRO_CONFIG_STATIC2 (Bank 1, 0x0B) */
 inline constexpr uint8_t GYRO_AAF_DIS = 0x02;
@@ -218,16 +218,16 @@ inline constexpr uint8_t NF_BW_SEL_MASK = 0x70;
 /* INTF_CONFIG6 (Bank 1, 0x7C) */
 inline constexpr uint8_t I3C_EN_MASK = 0x1F;
 
-/* ── Bank 2 Field Values ──────────────────────────────────────────────── */
+/* Wartosci rejestrow w BANK 2*/
 
 /* ACCEL_CONFIG_STATIC2 (Bank 2, 0x03) */
 inline constexpr uint8_t ACCEL_AAF_DIS = 0x01;
 
 }  // namespace iim42653_reg
 
-/* ═══════════════════════════════════════════════════════════════════════════
- * Configuration Enumerations
- * ═══════════════════════════════════════════════════════════════════════════ */
+/* ====================================
+ * Enumy configow
+ * ===================================*/
 
 /** Gyroscope full-scale range. Bits [7:5] of GYRO_CONFIG0. */
 enum class GyroFsr : uint8_t
@@ -349,7 +349,7 @@ struct AafBw
         return {0, 0, 0};
     }
 
-    /* ── Selected presets (sorted by 3 dB BW) ────────────────────────── */
+    /* Selected presets (sorted by 3 dB BW)*/
 
     /** ~213 Hz — heavy filtering for low-vibration environments. */
     static constexpr AafBw bw_213()
@@ -403,9 +403,9 @@ struct GyroNotchConfig
     }
 };
 
-/* ═══════════════════════════════════════════════════════════════════════════
+/* =====================
  * Driver Configuration
- * ═══════════════════════════════════════════════════════════════════════════ */
+ * ===================== */
 
 struct Iim42653Config
 {
@@ -488,9 +488,9 @@ struct Iim42653Config
     }
 };
 
-/* ═══════════════════════════════════════════════════════════════════════════
+/* ======================
  * IIM-42653 Driver Class
- * ═══════════════════════════════════════════════════════════════════════════ */
+ * ====================== */
 
 class Iim42653
 {
@@ -615,7 +615,7 @@ class Iim42653
     }
 
   private:
-    /* ── Register access helpers ─────────────────────────────────────── */
+    /* Register access helpers */
 
     [[nodiscard]] bool                   write_reg(uint8_t reg, uint8_t value);
     [[nodiscard]] std::optional<uint8_t> read_reg(uint8_t reg);
@@ -668,14 +668,14 @@ class Iim42653
         bool      ok_;
     };
 
-    /* ── Scale factor computation ────────────────────────────────────── */
+    /* Scale factor computation */
 
     void compute_scale_factors();
 
     static float gyro_sensitivity(GyroFsr fsr);
     static float accel_sensitivity(AccelFsr fsr);
 
-    /* ── Init / configure helpers ────────────────────────────────────── */
+    /* Init / configure helpers */
 
     [[nodiscard]] bool configure_interface();
     [[nodiscard]] bool configure_odr_fsr(const Iim42653Config &cfg);
@@ -685,17 +685,17 @@ class Iim42653
     [[nodiscard]] bool configure_interrupts(const Iim42653Config &cfg);
     [[nodiscard]] bool configure_fifo(const Iim42653Config &cfg);
 
-    /* ── FIFO helpers ────────────────────────────────────────────────── */
+    /* FIFO helpers  */
 
     [[nodiscard]] int16_t fifo_byte_count();
     [[nodiscard]] bool    parse_fifo_packet(const uint8_t *pkt, ImuSample &sample) const;
 
-    /* ── Conversion helpers ───────────────────────────────────────────── */
+    /* Conversion helpers */
 
     void convert_inertial(const int16_t accel[3], const int16_t gyro[3], ImuSample &sample) const;
     static bool has_invalid(const int16_t data[3]);
 
-    /* ── Self-test helpers ───────────────────────────────────────────── */
+    /* Self-test helpers */
 
     [[nodiscard]] bool read_raw(int16_t accel[3], int16_t gyro[3]);
     [[nodiscard]] bool setup_self_test_mode();
@@ -706,11 +706,11 @@ class Iim42653
                                            const float gyro_ref[3],
                                            const float accel_ref[3]);
 
-    /* ── Error handling ──────────────────────────────────────────────── */
+    /* Error handling */
 
     void report_error();
 
-    /* ── Constants ───────────────────────────────────────────────────── */
+    /* Constants */
 
     static constexpr float kPi         = 3.14159265358979323846f;
     static constexpr float kGravity    = 9.80665f;
@@ -727,7 +727,7 @@ class Iim42653
     /** Max FIFO capacity: 2080 / 16 = 130 packets */
     static constexpr size_t kFifoMaxPackets = 130;
 
-    /* ── State ───────────────────────────────────────────────────────── */
+    /* State */
 
     SpiBus          *spi_          = nullptr;
     ioline_t         cs_line_      = 0;
