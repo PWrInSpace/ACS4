@@ -22,6 +22,7 @@ extern "C" {
 }
 
 #include "drivers/iim42653.h"
+#include "drivers/ms5611.h"
 #include "system/error_handler.h"
 #include "system/params.h"
 #include "utils/profiler.h"
@@ -101,7 +102,7 @@ static void cmd_threads(BaseSequentialStream *chp, int argc, char *argv[])
 
         const char *name = (tp->name != nullptr) ? tp->name : "<unnamed>";
         const auto  idx  = static_cast<unsigned>(tp->state);
-        const char *st = (idx < std::size(state_names)) ? state_names[idx] : "???";
+        const char *st   = (idx < std::size(state_names)) ? state_names[idx] : "???";
 
         chprintf(chp,
                  "%-16s %4u %10lu %s\r\n",
@@ -198,7 +199,7 @@ static void cmd_sensor(BaseSequentialStream *chp, int argc, char *argv[])
 {
     if (argc == 0)
     {
-        chprintf(chp, "Usage: sensor imu\r\n");
+        chprintf(chp, "Usage: sensor imu | baro\r\n");
         return;
     }
 
@@ -232,10 +233,32 @@ static void cmd_sensor(BaseSequentialStream *chp, int argc, char *argv[])
         chprintf(chp, "Timestamp:    %lu us\r\n", sample.timestamp_us);
         chprintf(chp, "Errors:       %lu\r\n", imu->error_count());
     }
+    else if (strcmp(argv[0], "baro") == 0)
+    {
+        auto *baro = acs::baro_instance();
+        if (baro == nullptr)
+        {
+            chprintf(chp, "BARO not available (no hardware or init failed)\r\n");
+            return;
+        }
+
+        if (!baro->has_new_data())
+        {
+            chprintf(chp, "BARO: no new data (errors: %lu)\r\n", baro->error_count());
+            return;
+        }
+
+        const acs::BaroSample s = baro->sample();
+        chprintf(chp, "Pressure:    %.2f Pa\r\n", static_cast<double>(s.pressure_pa));
+        chprintf(chp, "Temperature: %.2f C\r\n", static_cast<double>(s.temperature_c));
+        chprintf(chp, "Altitude:    %.2f m\r\n", static_cast<double>(s.altitude_m));
+        chprintf(chp, "Timestamp:   %lu us\r\n", s.timestamp_us);
+        chprintf(chp, "Errors:      %lu\r\n", baro->error_count());
+    }
     else
     {
         chprintf(chp, "Unknown sensor: %s\r\n", argv[0]);
-        chprintf(chp, "Available: imu\r\n");
+        chprintf(chp, "Available: imu, baro\r\n");
     }
 }
 
@@ -243,14 +266,14 @@ static void cmd_sensor(BaseSequentialStream *chp, int argc, char *argv[])
 
 static const ShellCommand shell_commands[] = {
     {"version", cmd_version},
-    {"uptime",  cmd_uptime },
+    { "uptime",  cmd_uptime},
     {"threads", cmd_threads},
-    {"reboot",  cmd_reboot },
-    {"perf",    cmd_perf   },
-    {"errors",  cmd_errors },
-    {"param",   cmd_param  },
-    {"sensor",  cmd_sensor },
-    {nullptr,   nullptr    }
+    { "reboot",  cmd_reboot},
+    {   "perf",    cmd_perf},
+    { "errors",  cmd_errors},
+    {  "param",   cmd_param},
+    { "sensor",  cmd_sensor},
+    {  nullptr,     nullptr}
 };
 
 /* ── Shell thread ─────────────────────────────────────────────────────── */

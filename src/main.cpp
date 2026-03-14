@@ -26,6 +26,7 @@ extern "C" {
 }
 
 #include "drivers/iim42653.h"
+#include "drivers/ms5611.h"
 #include "system/debug_shell.h"
 #include "system/error_handler.h"
 #include "system/watchdog.h"
@@ -57,17 +58,37 @@ static const SPIConfig imu_spi_cfg = {
     .cfg2     = SPI_CFG2_CPOL | SPI_CFG2_CPHA, /* SPI Mode 3 */
 };
 
+static const SPIConfig baro_spi_cfg = {
+    .circular = false,
+    .slave    = false,
+    .data_cb  = nullptr,
+    .error_cb = nullptr,
+    .cfg1     = SPI_CFG1_MBR_DIV8,             /* kernel_clk / 8 */
+    .cfg2     = SPI_CFG2_CPOL | SPI_CFG2_CPHA, /* SPI Mode 3 */
+};
+
 static acs::SpiBus   g_spi;
 static acs::Iim42653 g_imu;
+static acs::Ms5611   g_baro;
 
 acs::Iim42653 *acs::imu_instance()
 {
     return g_imu.is_initialized() ? &g_imu : nullptr;
 }
 
+acs::Ms5611 *acs::baro_instance()
+{
+    return g_baro.is_initialized() ? &g_baro : nullptr;
+}
+
 #else /* NUCLEO — no sensors */
 
 acs::Iim42653 *acs::imu_instance()
+{
+    return nullptr;
+}
+
+acs::Ms5611 *acs::baro_instance()
 {
     return nullptr;
 }
@@ -156,6 +177,15 @@ int main()
         else
         {
             chprintf(serial, "IMU: init FAILED\r\n");
+        }
+
+        if (g_baro.init(g_spi, LINE_BARO_CS, baro_spi_cfg, acs::Ms5611Config::rocket_default()))
+        {
+            chprintf(serial, "BARO: MS5611 OK\r\n");
+        }
+        else
+        {
+            chprintf(serial, "BARO: init FAILED\r\n");
         }
     }
     else
