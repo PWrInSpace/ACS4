@@ -180,6 +180,8 @@ set(APP_SOURCES
     src/hal/i2c_bus.cpp
     src/hal/spi_bus.cpp
     src/drivers/iim42653.cpp
+    src/drivers/ms5611.cpp
+    src/drivers/ms5611_math.cpp
     src/system/debug_shell.cpp
     src/system/error_handler.cpp
     src/system/params.cpp

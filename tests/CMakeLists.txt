@@ -25,12 +25,14 @@ set(EIGEN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../lib/eigen)
 # ── Navigation sources (platform-independent, no ChibiOS deps) ───────────
 set(NAV_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/../src/navigation/quaternion.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/drivers/ms5611_math.cpp
 )
 
 # ── Test sources ──────────────────────────────────────────────────────────
 set(TEST_SOURCES
     unit/test_quaternion.cpp
     unit/test_iim42653.cpp
+    unit/test_ms5611.cpp
 )
 
 # ── Test executable ───────────────────────────────────────────────────────
