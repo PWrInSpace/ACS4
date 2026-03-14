@@ -36,45 +36,24 @@
 namespace acs
 {
 
-/* ═══════════════════════════════════════════════════════════════════════════
- * BaroSample — output data structure posted to mailbox
- * ═══════════════════════════════════════════════════════════════════════════ */
+/* ========================================================
+ * BaroSample — Skompensowany output z barometru
+ * ======================================================== */
 
 struct BaroSample
 {
-    float    pressure_pa;   /* compensated pressure, Pa */
-    float    temperature_c; /* compensated temperature, °C */
-    float    altitude_m;    /* barometric altitude (ISA or QNH), m */
-    uint32_t timestamp_us;  /* host µs (DWT) at end of conversion */
+    float    pressure_pa;   /* Skompensowane cisnienie, Pa */
+    float    temperature_c; /* Skompensowana temeperatura, degC */
+    float    altitude_m;    /* Wysokosc barometryczna (ISA lub QNH), m */
+    uint32_t timestamp_us;  /* host µs (DWT) na koncu konwersji */
 };
 
-/* ═══════════════════════════════════════════════════════════════════════════
- * MS5611 Command Set
- * ═══════════════════════════════════════════════════════════════════════════ */
-
-namespace ms5611_cmd
-{
-
-inline constexpr uint8_t RESET    = 0x1E;
-inline constexpr uint8_t ADC_READ = 0x00;
-
-/* Convert D1 (pressure) — base command, add OSR offset. */
-inline constexpr uint8_t CONVERT_D1 = 0x40;
-
-/* Convert D2 (temperature) — base command, add OSR offset. */
-inline constexpr uint8_t CONVERT_D2 = 0x50;
-
-/* PROM read base address. Address = 0xA0 + (index << 1), index 0–7. */
-inline constexpr uint8_t PROM_READ = 0xA0;
-
-}  // namespace ms5611_cmd
-
-/* ═══════════════════════════════════════════════════════════════════════════
- * Configuration
- * ═══════════════════════════════════════════════════════════════════════════ */
+/* ==================
+ * Konfiguracja
+ * =================== */
 
 /**
- * Oversampling ratio. Higher OSR = better resolution, longer conversion.
+ * Oversampling ratio. Wyzsze OSR = lepsza rozdzielczosc, dluzsza konwersja.
  * Value encodes the 2-bit offset added to CONVERT_D1/D2 commands.
  */
 enum class Ms5611Osr : uint8_t
@@ -88,12 +67,12 @@ enum class Ms5611Osr : uint8_t
 
 struct Ms5611Config
 {
-    Ms5611Osr osr;    /* oversampling ratio for both P and T */
-    float     qnh_pa; /* QNH reference pressure for altitude, Pa */
+    Ms5611Osr osr;    /* oversampling ratio zarowno dla P i T */
+    float     qnh_pa; /* QNH cisnienie odniesienia dla wysokosci, Pa */
 
     /**
-     * @brief Default configuration for rocket flight:
-     *   - OSR 4096 (best resolution, 10 cm altitude)
+     * @brief Defaultowa konfiguracja dla lotu rakiety:
+     *   - OSR 4096 (najlepsza rozdzielczosc, 10 cm wysokosci)
      *   - QNH = 101325 Pa (ISA standard)
      */
     static constexpr Ms5611Config rocket_default()
@@ -105,9 +84,9 @@ struct Ms5611Config
     }
 };
 
-/* ═══════════════════════════════════════════════════════════════════════════
+/* =====================
  * MS5611 Driver Class
- * ═══════════════════════════════════════════════════════════════════════════ */
+ * ===================== */
 
 class Ms5611
 {
@@ -120,11 +99,11 @@ class Ms5611
     Ms5611 &operator=(Ms5611 &&)      = delete;
 
     /**
-     * @brief Initialize the barometer (blocking).
+     * @brief Zanicjalizuj barometr (blocking).
      *
-     * Performs:
-     *   1. Reset command + 3 ms wait
-     *   2. PROM read (8 × 16-bit words, coefficients C1–C6)
+     * Wykonuje:
+     *   1. Komenda resetu + 3 ms czekania
+     *   2. PROM odczyt (8 × 16-bit words, coefficients C1–C6)
      *   3. CRC-4 validation of PROM contents
      *
      * @param spi       Reference to initialized SpiBus.
@@ -189,7 +168,7 @@ class Ms5611
     }
 
   private:
-    /* ── State machine ───────────────────────────────────────────────────── */
+    /* State machine */
 
     enum class State : uint8_t
     {
@@ -202,25 +181,25 @@ class Ms5611
         READ_D2,    /* read temperature result + compute */
     };
 
-    /* ── Computation helpers ──────────────────────────────────────────────── */
+    /* Computation helpers */
 
     void compute_and_publish();
 
-    /* ── SPI helpers ─────────────────────────────────────────────────────── */
+    /* SPI helpers  */
 
     [[nodiscard]] bool send_command(uint8_t cmd);
     [[nodiscard]] bool read_adc(uint32_t &result);
     [[nodiscard]] bool read_prom(uint16_t prom[8]);
 
-    /* ── Error handling ──────────────────────────────────────────────────── */
+    /* Error handling */
 
     void report_error();
 
-    /* ── Conversion time lookup ──────────────────────────────────────────── */
+    /* Conversion time lookup */
 
     static uint32_t conversion_time_us(Ms5611Osr osr);
 
-    /* ── State ───────────────────────────────────────────────────────────── */
+    /* State */
 
     SpiBus          *spi_     = nullptr;
     ioline_t         cs_line_ = 0;
@@ -231,7 +210,8 @@ class Ms5611
     volatile bool new_data_    = false;
     float         qnh_pa_      = 101325.0f;
 
-    Ms5611Osr osr_ = Ms5611Osr::OSR_4096;
+    Ms5611Osr osr_           = Ms5611Osr::OSR_4096;
+    uint32_t  conv_time_us_  = 0; /* cached conversion_time_us(osr_) */
 
     uint16_t cal_[6] = {}; /* C1–C6 calibration coefficients (PROM addresses 1–6) */
 

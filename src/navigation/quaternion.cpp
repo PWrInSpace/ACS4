@@ -11,7 +11,7 @@
 namespace acs::nav
 {
 
-/* ── Construction ────────────────────────────────────────────────────────── */
+/*  Construction  */
 
 Quat quat_from_rotation_vector(const Vec3 &rv)
 {
@@ -57,7 +57,7 @@ Quat quat_from_euler(float roll, float pitch, float yaw)
                 cr * cp * sy - sr * sp * cy); /* z */
 }
 
-/* ── Core operations ─────────────────────────────────────────────────────── */
+/* Core operations */
 
 Quat quat_normalize(const Quat &q)
 {
@@ -69,7 +69,7 @@ Quat quat_normalize(const Quat &q)
     return Quat(q.coeffs() / n);
 }
 
-/* ── Euler extraction ────────────────────────────────────────────────────── */
+/* Euler extraction */
 
 void quat_to_euler(const Quat &q, float &roll, float &pitch, float &yaw)
 {
@@ -97,7 +97,7 @@ void quat_to_euler(const Quat &q, float &roll, float &pitch, float &yaw)
     yaw   = std::atan2(2.0f * (x * y + w * z), w * w + x * x - y * y - z * z);
 }
 
-/* ── Integration ─────────────────────────────────────────────────────────── */
+/* Integration */
 
 Quat quat_integrate(const Quat &q, const Vec3 &omega, float dt)
 {
@@ -106,7 +106,7 @@ Quat quat_integrate(const Quat &q, const Vec3 &omega, float dt)
     return (q * dq).normalized();
 }
 
-/* ── Error metrics ───────────────────────────────────────────────────────── */
+/* Error metrics */
 
 float quat_error_angle(const Quat &a, const Quat &b)
 {

@@ -4,6 +4,9 @@
  * Lightweight per-slot profiler based on DWT cycle counter.
  * Each slot tracks: last / avg / max execution time in cycles.
  * Use PROFILE_BEGIN / PROFILE_END macros in hot loops.
+ *
+ * profiler_begin / profiler_end are inline for zero-overhead
+ * instrumentation. Cold-path functions live in profiler.cpp.
  */
 
 #pragma once
@@ -12,17 +15,13 @@
 
 extern "C" {
 #include "hal.h"
-
-#include <chprintf.h>
 }
-
-#include "utils/timestamp.h"
 
 namespace acs
 {
 
 /* Maximum number of independently tracked profiling slots. */
-static constexpr int PROFILER_MAX_SLOTS = 16;
+inline constexpr int PROFILER_MAX_SLOTS = 16;
 
 /**
  * @brief Data for a single profiling slot.
@@ -52,26 +51,7 @@ inline int &profiler_slot_count()
     return n;
 }
 
-/**
- * @brief Register a named profiling slot. Returns slot ID.
- *        Call at init time (not in hot path).
- */
-inline int profiler_register(const char *name)
-{
-    int &n = profiler_slot_count();
-    if (n >= PROFILER_MAX_SLOTS)
-    {
-        return -1;
-    }
-    const int id   = n++;
-    auto     &s    = profiler_slot(id);
-    s.name         = name;
-    s.last_cycles  = 0;
-    s.max_cycles   = 0;
-    s.total_cycles = 0;
-    s.count        = 0;
-    return id;
-}
+/* ── Hot-path functions (inline) ──────────────────────────────────────── */
 
 /**
  * @brief Begin timing for a slot.
@@ -99,59 +79,23 @@ inline void profiler_end(int slot_id)
     }
 }
 
+/* ── Cold-path functions (defined in profiler.cpp) ────────────────────── */
+
+/**
+ * @brief Register a named profiling slot. Returns slot ID.
+ *        Call at init time (not in hot path).
+ */
+int profiler_register(const char *name);
+
 /**
  * @brief Print all profiler slots to a stream (shell `perf` command).
  */
-inline void profiler_print(BaseSequentialStream *chp)
-{
-    const int n = profiler_slot_count();
-    if (n == 0)
-    {
-        chprintf(chp, "No profiling slots registered.\r\n");
-        return;
-    }
-
-    chprintf(chp,
-             "%-24s %10s %10s %10s %10s\r\n",
-             "Slot",
-             "Last(us)",
-             "Avg(us)",
-             "Max(us)",
-             "Count");
-    chprintf(chp,
-             "-----------------------------------------------------------------"
-             "-----\r\n");
-
-    for (int i = 0; i < n && i < PROFILER_MAX_SLOTS; i++)
-    {
-        auto       &s = profiler_slot(i);
-        const float avg_us =
-            (s.count > 0) ? cycles_to_us(static_cast<uint32_t>(s.total_cycles / s.count)) : 0.0f;
-        chprintf(chp,
-                 "%-24s %10.1f %10.1f %10.1f %10lu\r\n",
-                 s.name,
-                 static_cast<double>(cycles_to_us(s.last_cycles)),
-                 static_cast<double>(avg_us),
-                 static_cast<double>(cycles_to_us(s.max_cycles)),
-                 s.count);
-    }
-}
+void profiler_print(BaseSequentialStream *chp);
 
 /**
  * @brief Reset stats for all slots (but keep registrations).
  */
-inline void profiler_reset()
-{
-    const int n = profiler_slot_count();
-    for (int i = 0; i < n && i < PROFILER_MAX_SLOTS; i++)
-    {
-        auto &s        = profiler_slot(i);
-        s.last_cycles  = 0;
-        s.max_cycles   = 0;
-        s.total_cycles = 0;
-        s.count        = 0;
-    }
-}
+void profiler_reset();
 
 }  // namespace acs
 

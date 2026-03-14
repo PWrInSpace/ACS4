@@ -29,6 +29,7 @@
 
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <optional>
 
@@ -43,10 +44,10 @@ namespace acs
 
 struct ImuSample
 {
-    float    accel_mps2[3]; /* X, Y, Z — body frame, m/s² */
-    float    gyro_rads[3];  /* X, Y, Z — body frame, rad/s */
-    float    temp_degc;     /* die temperature, °C (NaN if sensor data not ready) */
-    uint32_t timestamp_us;  /* host µs — DWT (register) or reconstructed (FIFO) */
+    std::array<float, 3> accel_mps2; /* X, Y, Z — body frame, m/s² */
+    std::array<float, 3> gyro_rads;  /* X, Y, Z — body frame, rad/s */
+    float                temp_degc;     /* die temperature, °C (NaN if sensor data not ready) */
+    uint32_t             timestamp_us;  /* host µs — DWT (register) or reconstructed (FIFO) */
 };
 
 /* ======================
@@ -596,7 +597,8 @@ class Iim42653
      * @return true on success.
      * @pre Sensors must be OFF (call before configure(), or disable sensors first).
      */
-    [[nodiscard]] bool set_offsets(const float gyro_bias_dps[3], const float accel_bias_g[3]);
+    [[nodiscard]] bool
+    set_offsets(const std::array<float, 3> &gyro_bias_dps, const std::array<float, 3> &accel_bias_g);
 
     /**
      * @brief Check if the driver has been successfully initialized.

@@ -188,6 +188,7 @@ set(APP_SOURCES
     src/system/syscalls.c
     src/system/usb_cdc.cpp
     src/system/watchdog.cpp
+    src/utils/profiler.cpp
 )
 
 # =============================================================================

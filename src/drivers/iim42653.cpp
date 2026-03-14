@@ -880,7 +880,8 @@ bool Iim42653::flush_fifo()
  * Sprzetowa kalibracja offsetow
  * ============================ */
 
-bool Iim42653::set_offsets(const float gyro_bias_dps[3], const float accel_bias_g[3])
+bool Iim42653::set_offsets(const std::array<float, 3> &gyro_bias_dps,
+                          const std::array<float, 3> &accel_bias_g)
 {
     if (!initialized_)
     {
