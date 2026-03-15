@@ -26,6 +26,7 @@ extern "C" {
 }
 
 #include "drivers/iim42653.h"
+#include "drivers/mmc5983ma.h"
 #include "drivers/ms5611.h"
 #include "system/debug_shell.h"
 #include "system/error_handler.h"
@@ -67,9 +68,19 @@ static const SPIConfig baro_spi_cfg = {
     .cfg2     = SPI_CFG2_CPOL | SPI_CFG2_CPHA, /* SPI Mode 3 */
 };
 
-static acs::SpiBus   g_spi;
-static acs::Iim42653 g_imu;
-static acs::Ms5611   g_baro;
+static const SPIConfig mag_spi_cfg = {
+    .circular = false,
+    .slave    = false,
+    .data_cb  = nullptr,
+    .error_cb = nullptr,
+    .cfg1     = SPI_CFG1_MBR_DIV8,             /* kernel_clk / 8 → 6.25 MHz */
+    .cfg2     = SPI_CFG2_CPOL | SPI_CFG2_CPHA, /* SPI Mode 3 */
+};
+
+static acs::SpiBus    g_spi;
+static acs::Iim42653  g_imu;
+static acs::Ms5611    g_baro;
+static acs::Mmc5983ma g_mag;
 
 acs::Iim42653 *acs::imu_instance()
 {
@@ -81,6 +92,11 @@ acs::Ms5611 *acs::baro_instance()
     return g_baro.is_initialized() ? &g_baro : nullptr;
 }
 
+acs::Mmc5983ma *acs::mag_instance()
+{
+    return g_mag.is_initialized() ? &g_mag : nullptr;
+}
+
 #else /* NUCLEO — no sensors */
 
 acs::Iim42653 *acs::imu_instance()
@@ -89,6 +105,11 @@ acs::Iim42653 *acs::imu_instance()
 }
 
 acs::Ms5611 *acs::baro_instance()
+{
+    return nullptr;
+}
+
+acs::Mmc5983ma *acs::mag_instance()
 {
     return nullptr;
 }
@@ -186,6 +207,22 @@ int main()
         else
         {
             chprintf(serial, "BARO: init FAILED\r\n");
+        }
+
+        if (g_mag.init(g_spi, LINE_MAG_CS, mag_spi_cfg))
+        {
+            if (g_mag.configure(acs::Mmc5983maConfig::rocket_default()))
+            {
+                chprintf(serial, "MAG: MMC5983MA OK\r\n");
+            }
+            else
+            {
+                chprintf(serial, "MAG: configure FAILED\r\n");
+            }
+        }
+        else
+        {
+            chprintf(serial, "MAG: init FAILED\r\n");
         }
     }
     else

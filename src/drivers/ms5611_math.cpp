@@ -1,7 +1,6 @@
 /*
- * ACS4 Flight Computer — MS5611 Platform-Independent Math (Implementation)
+ * ACS4 Flight Computer — MS5611 Niezalezna platformowo matma 
  *
- * See ms5611_math.h for API documentation.
  */
 
 #include "drivers/ms5611_math.h"
@@ -12,20 +11,20 @@
 namespace acs::ms5611
 {
 
-/* ═══════════════════════════════════════════════════════════════════════════
+/* ===========================
  * CRC-4 Verification (AN520)
- * ═══════════════════════════════════════════════════════════════════════════ */
+ * =========================== */
 
 bool verify_crc4(const uint16_t prom[8])
 {
-    /* Extract stored CRC from prom[7] bits [3:0]. */
+    /* Wyekstraktuj storagowany CRC z prom[7] bits [3:0]. */
     const uint16_t crc_stored = prom[7] & 0x000F;
 
-    /* Work on a copy — the algorithm modifies prom[0] and prom[7]. */
+    /* Pracujemy na kopii — algorytm modyfikuje prom[0] i prom[7]. */
     uint16_t work[8];
     std::copy(prom, prom + 8, work);
 
-    work[7] &= 0xFF00; /* CRC byte is replaced by 0 */
+    work[7] &= 0xFF00; 
 
     uint16_t remainder = 0;
     for (int cnt = 0; cnt < 16; ++cnt)
@@ -57,9 +56,9 @@ bool verify_crc4(const uint16_t prom[8])
     return remainder == crc_stored;
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
- * Compensation (datasheet formulas + 2nd order)
- * ═══════════════════════════════════════════════════════════════════════════ */
+/* ==============================================
+ * Kompensacja (wzory z datasheeta + drugi rzad)
+ * ============================================== */
 
 void compensate(uint32_t       d1,
                 uint32_t       d2,
@@ -68,31 +67,31 @@ void compensate(uint32_t       d1,
                 float         &temperature_c)
 {
     /*
-     * Variable naming follows the datasheet exactly.
-     * All arithmetic uses int64_t to avoid overflow in intermediate results.
-     * The datasheet specifies up to 58-bit intermediates.
+     * Nazwy zmiennych zgodne z datasheetem.
+     * Cala arytmetyka uzywa int64_t by uniknac overflow w posrednich wynikach.
+     * Datasheet przewiduje wartosci posrednie do ~58 bitow.
      */
 
-    /* Temperature difference from reference. */
+    /* Roznica temperatury wzgledem temperatury referencyjnej. */
     const auto dT = static_cast<int64_t>(d2) - (static_cast<int64_t>(c[4]) << 8);
 
-    /* Actual temperature (centidegrees: 2000 = 20.00°C). */
+    /* Rzeczywista temperatura (w setnych części stopnia: 2000 = 20.00°C). */
     int64_t TEMP = 2000 + ((dT * static_cast<int64_t>(c[5])) >> 23);
 
-    /* Offset at actual temperature. */
+    /* Offset przy aktualnej temperaturze. */
     int64_t OFF = (static_cast<int64_t>(c[1]) << 16) + ((static_cast<int64_t>(c[3]) * dT) >> 7);
 
-    /* Sensitivity at actual temperature. */
+    /* Czułość (sensitivity) przy aktualnej temperaturze. */
     int64_t SENS = (static_cast<int64_t>(c[0]) << 15) + ((static_cast<int64_t>(c[2]) * dT) >> 8);
 
-    /* ── 2nd order temperature compensation ────────────────────────────── */
+    /* Kompensacja temperaturowa drugiego rzedu*/
     int64_t T2    = 0;
     int64_t OFF2  = 0;
     int64_t SENS2 = 0;
 
     if (TEMP < 2000)
     {
-        /* Low temperature (< 20°C). */
+        /* Niska temperatura (< 20 deg_C). */
         const int64_t temp_diff = TEMP - 2000;
         T2                      = (dT * dT) >> 31;
         OFF2                    = (5 * temp_diff * temp_diff) >> 1;
@@ -100,7 +99,7 @@ void compensate(uint32_t       d1,
 
         if (TEMP < -1500)
         {
-            /* Very low temperature (< −15°C). */
+            /* Bardzo niska temperatura (< −15 deg_C). */
             const int64_t temp_diff2 = TEMP + 1500;
             OFF2 += 7 * temp_diff2 * temp_diff2;
             SENS2 += (11 * temp_diff2 * temp_diff2) >> 1;
@@ -111,19 +110,19 @@ void compensate(uint32_t       d1,
     OFF -= OFF2;
     SENS -= SENS2;
 
-    /* Temperature compensated pressure (centipascals: 100009 = 1000.09 mbar). */
+    /* Cisnienie skompensowane temperaturowo (centipascals: 100009 = 1000.09 mbar). */
     const int64_t P = ((static_cast<int64_t>(d1) * SENS >> 21) - OFF) >> 15;
 
-    /* Convert to SI: °C and Pa.
-     * TEMP is in centidegrees (2007 = 20.07°C).
+    /* Konwersja do SI, Paskale i stopnie Celsjusza.
+     * TEMP is in centidegrees (2007 = 20.07 deg_C).
      * P is in units of 0.01 mbar; since 0.01 mbar = 1 Pa, P is directly in Pa. */
     temperature_c = static_cast<float>(TEMP) * 0.01f;
     pressure_pa   = static_cast<float>(P);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
- * Altitude Conversion
- * ═══════════════════════════════════════════════════════════════════════════ */
+/* ===================
+ * Liczenie wysokosci
+ * =================== */
 
 float pressure_to_altitude(float pressure_pa, float qnh_pa)
 {
