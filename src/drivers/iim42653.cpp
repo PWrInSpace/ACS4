@@ -764,11 +764,11 @@ size_t Iim42653::read_fifo(ImuSample *samples, size_t max_count)
     }
 
     /*
-     * Capture host time — assigned to the newest sample.
+     * Pobierz czas hosta — zostanie przypisany do najnowszej próbki.
      */
     const uint32_t host_time = timestamp_us();
 
-    /* Check for FIFO overflow (bit 1 of INT_STATUS). */
+    /* Sprawdź przepełnienie FIFO (bit 1 rejestru INT_STATUS) */
     auto int_status = read_reg(INT_STATUS);
     if (int_status.has_value() && (int_status.value() & FIFO_OVERFLOW_INT) != 0)
     {
@@ -777,7 +777,7 @@ size_t Iim42653::read_fifo(ImuSample *samples, size_t max_count)
         return 0;
     }
 
-    /* Read FIFO byte count and compute number of complete packets. */
+    /* Odczytaj liczbę bajtów w FIFO i oblicz liczbę pełnych pakietów. */
     const int16_t byte_count = fifo_byte_count();
     if (byte_count <= 0)
     {
@@ -801,8 +801,8 @@ size_t Iim42653::read_fifo(ImuSample *samples, size_t max_count)
     }
 
     /*
-     * Bulk-read all FIFO packets in a single SPI transaction.
-     * This avoids per-packet CS toggle + DMA setup overhead.
+     * Odczytaj wszystkie pakiety FIFO w jednej transakcji SPI.
+     * Pozwala to uniknąć kosztu przełączania CS i konfiguracji DMA dla każdego pakietu.
      */
     const size_t total_bytes = n_packets * kFifoPacketSize;
 
@@ -812,7 +812,7 @@ size_t Iim42653::read_fifo(ImuSample *samples, size_t max_count)
         return 0;
     }
 
-    /* Parse packets. FIFO outputs oldest-first. */
+    /* Sparsuj pakiety. FIFO zwraca dane od najstarszego do najnowszego. */
     size_t valid = 0;
     for (size_t i = 0; i < n_packets; ++i)
     {
@@ -936,8 +936,8 @@ bool Iim42653::set_offsets(const std::array<float, 3> &gyro_bias_dps,
     const int16_t ay = to_accel_lsb(accel_bias_g[1]);
     const int16_t az = to_accel_lsb(accel_bias_g[2]);
 
-    /* Cast to unsigned before bit manipulation to avoid implementation-defined
-     * behaviour of right-shifting negative signed integers. */
+    /* Rzutuj na unsigned przed manipulacja bitowa, aby uniknac implementacyjnie zaleznego
+     * zachowania przy przesunieciu w prawo liczb ze znakiem. */
     const auto ugx = static_cast<uint16_t>(gx);
     const auto ugy = static_cast<uint16_t>(gy);
     const auto ugz = static_cast<uint16_t>(gz);
@@ -945,7 +945,7 @@ bool Iim42653::set_offsets(const std::array<float, 3> &gyro_bias_dps,
     const auto uay = static_cast<uint16_t>(ay);
     const auto uaz = static_cast<uint16_t>(az);
 
-    /* Pack into 9 register bytes. Each 12-bit value splits across two regs. */
+    /* Spakuj do 9 bajtow rejestrow. Kazda wartosc 12-bitowa jest dzielona miedzy dwa rejestry. */
     const uint8_t regs[9] = {
         static_cast<uint8_t>(ugx & 0xFF),                                  /* USER0 */
         static_cast<uint8_t>(((ugy & 0x0F00) >> 4) | ((ugx >> 8) & 0x0F)), /* USER1 */
@@ -958,7 +958,7 @@ bool Iim42653::set_offsets(const std::array<float, 3> &gyro_bias_dps,
         static_cast<uint8_t>(uaz & 0xFF),                                  /* USER8 */
     };
 
-    /* Write all 9 offset registers in a single bank 4 session. */
+    /* Zapisz wszystkie 9 rejestrow offsetow w jednej sesji banku 4. */
     {
         const BankScope bank(*this, 4);
         if (!bank)
@@ -1014,20 +1014,20 @@ bool Iim42653::self_test()
 
     static constexpr int kNumSamples = 200;
 
-    /* Save current config to restore later. */
+    /* Zachowaj obecna konfiguracja aby przywrocic ja pozniej. */
     const Iim42653Config saved_config = config_;
 
-    /* Helper: always restore original config before returning. */
+    /* Helper: zawsze przywroc oryginalna konfiguracje przed wyjsciem. */
     auto restore = [&]() { (void)configure(saved_config); };
 
-    /* Configure for self-test ranges and stabilize. */
+    /* Skonfiguruj zakresy do self-testu i poczekaj na stabilizacje */
     if (!setup_self_test_mode())
     {
         restore();
         return false;
     }
 
-    /* Collect samples with self-test OFF. */
+    /* Zbierz probki przy wylaczonym self-tescie */
     int32_t accel_off[3] = {0, 0, 0};
     int32_t gyro_off[3]  = {0, 0, 0};
 
@@ -1037,7 +1037,7 @@ bool Iim42653::self_test()
         return false;
     }
 
-    /* Enable self-test. */
+    /* Wlacz self-test */
     if (!write_reg(SELF_TEST_CONFIG, ST_ENABLE_ALL))
     {
         restore();
@@ -1046,7 +1046,7 @@ bool Iim42653::self_test()
 
     chThdSleepMilliseconds(200);
 
-    /* Collect samples with self-test ON. */
+    /* Zbierz probki przy wlaczonym self-tescie. */
     int32_t accel_on[3] = {0, 0, 0};
     int32_t gyro_on[3]  = {0, 0, 0};
 
@@ -1057,7 +1057,7 @@ bool Iim42653::self_test()
         return false;
     }
 
-    /* Disable self-test. */
+    /* Wylacz self-test */
     if (!write_reg(SELF_TEST_CONFIG, ST_DISABLE))
     {
         restore();
@@ -1066,7 +1066,7 @@ bool Iim42653::self_test()
 
     chThdSleepMilliseconds(100);
 
-    /* Compute self-test response. */
+    /* Oblicz odpowiedz self-testu. */
     float accel_response[3];
     float gyro_response[3];
     for (int ax = 0; ax < 3; ++ax)
@@ -1077,7 +1077,7 @@ bool Iim42653::self_test()
             static_cast<float>(gyro_on[ax] - gyro_off[ax]) / static_cast<float>(kNumSamples);
     }
 
-    /* Read factory references and validate. */
+    /* Odczytaj referencje fabryczne i zweryfikuj wyniki */
     float gyro_st_ref[3];
     float accel_st_ref[3];
     if (!read_st_factory_refs(gyro_st_ref, accel_st_ref))
@@ -1134,7 +1134,7 @@ bool Iim42653::collect_st_samples(int32_t accel_sum[3], int32_t gyro_sum[3], int
 {
     for (int i = 0; i < count; ++i)
     {
-        /* Wait for fresh sample (DRDY) to avoid reading stale data. */
+        /* Czekaj na swieza probke (DRDY), aby uniknac odczytu starych danych */
         static constexpr int kDrdyTimeoutIter = 20;
         bool                 ready            = false;
         for (int w = 0; w < kDrdyTimeoutIter; ++w)
@@ -1176,7 +1176,7 @@ bool Iim42653::read_st_factory_refs(float gyro_ref[3], float accel_ref[3])
     uint8_t gyro_codes[3];
     uint8_t accel_codes[3];
 
-    /* Read gyro self-test references — single bank 1 session. */
+    /* Odczytaj referencje self-testu gyro - jedna sesja banku 1 */
     {
         const BankScope bank(*this, 1);
         if (!bank)
@@ -1195,7 +1195,7 @@ bool Iim42653::read_st_factory_refs(float gyro_ref[3], float accel_ref[3])
         }
     }
 
-    /* Read accel self-test references — single bank 2 session. */
+    /* Odczytaj referencje self-testu akcelerometru - jedna sesja banku 2 */
     {
         const BankScope bank(*this, 2);
         if (!bank)

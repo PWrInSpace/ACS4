@@ -19,12 +19,12 @@
 namespace acs::nav
 {
 
-/* ── Type aliases ────────────────────────────────────────────────────────── */
+/* Type aliases */
 using Quat = Eigen::Quaternionf;
 using Vec3 = Eigen::Vector3f;
 using Mat3 = Eigen::Matrix3f;
 
-/* ── Construction ────────────────────────────────────────────────────────── */
+/* Construction */
 
 /** @brief Identity quaternion (no rotation). */
 [[nodiscard]] inline Quat quat_identity()
@@ -54,7 +54,7 @@ using Mat3 = Eigen::Matrix3f;
  */
 [[nodiscard]] Quat quat_from_euler(float roll, float pitch, float yaw);
 
-/* ── Core operations ─────────────────────────────────────────────────────── */
+/* Core operations */
 
 /** @brief Normalize quaternion to unit length. Returns identity on NaN. */
 [[nodiscard]] Quat quat_normalize(const Quat &q);
@@ -92,7 +92,7 @@ using Mat3 = Eigen::Matrix3f;
     return q.toRotationMatrix();
 }
 
-/* ── Euler extraction (logging only!) ────────────────────────────────────── */
+/* Euler extraction (logging only!) */
 
 /**
  * @brief Extract ZYX Euler angles from quaternion.
@@ -104,7 +104,7 @@ using Mat3 = Eigen::Matrix3f;
  */
 void quat_to_euler(const Quat &q, float &roll, float &pitch, float &yaw);
 
-/* ── Integration (for IMU / ESKF predict) ────────────────────────────────── */
+/* Integration (for IMU / ESKF predict) */
 
 /**
  * @brief Integrate quaternion with angular velocity (1st-order).
@@ -119,7 +119,7 @@ void quat_to_euler(const Quat &q, float &roll, float &pitch, float &yaw);
  */
 [[nodiscard]] Quat quat_integrate(const Quat &q, const Vec3 &omega, float dt);
 
-/* ── Error metrics (for attitude control) ────────────────────────────────── */
+/* Error metrics (for attitude control) */
 
 /**
  * @brief Geodesic angle between two orientations.

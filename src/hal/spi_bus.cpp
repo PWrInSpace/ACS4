@@ -30,7 +30,7 @@ extern "C" {
 namespace acs
 {
 
-/* ── Init ─────────────────────────────────────────────────────────────── */
+/* Init */
 
 bool SpiBus::init(SPIDriver *driver)
 {
@@ -46,7 +46,7 @@ bool SpiBus::init(SPIDriver *driver)
     return true;
 }
 
-/* ── Full-duplex exchange ─────────────────────────────────────────────── */
+/* Full-duplex exchange */
 
 bool SpiBus::transfer(ioline_t         cs_line,
                       const uint8_t   *tx,
@@ -80,7 +80,7 @@ bool SpiBus::transfer(ioline_t         cs_line,
     return true;
 }
 
-/* ── TX-only ──────────────────────────────────────────────────────────── */
+/* TX-only */
 
 bool SpiBus::send(ioline_t cs_line, const uint8_t *tx, size_t len, const SPIConfig &config)
 {
@@ -103,7 +103,7 @@ bool SpiBus::send(ioline_t cs_line, const uint8_t *tx, size_t len, const SPIConf
     return true;
 }
 
-/* ── RX-only ──────────────────────────────────────────────────────────── */
+/* RX-only */
 
 bool SpiBus::receive(ioline_t cs_line, uint8_t *rx, size_t len, const SPIConfig &config)
 {
@@ -126,7 +126,7 @@ bool SpiBus::receive(ioline_t cs_line, uint8_t *rx, size_t len, const SPIConfig 
     return true;
 }
 
-/* ── Read single register ─────────────────────────────────────────────── */
+/* Read single register */
 
 std::optional<uint8_t> SpiBus::read_register(ioline_t cs_line, uint8_t reg, const SPIConfig &config)
 {
@@ -149,7 +149,7 @@ std::optional<uint8_t> SpiBus::read_register(ioline_t cs_line, uint8_t reg, cons
     return rx_buf[1];
 }
 
-/* ── Write single register ────────────────────────────────────────────── */
+/* Write single register */
 
 bool SpiBus::write_register(ioline_t cs_line, uint8_t reg, uint8_t value, const SPIConfig &config)
 {
@@ -163,7 +163,7 @@ bool SpiBus::write_register(ioline_t cs_line, uint8_t reg, uint8_t value, const 
     return send(cs_line, tx_buf, 2, config);
 }
 
-/* ── Burst register read ──────────────────────────────────────────────── */
+/* Burst register read */
 
 bool SpiBus::read_registers(ioline_t         cs_line,
                             uint8_t          reg,
@@ -209,7 +209,7 @@ bool SpiBus::read_registers(ioline_t         cs_line,
     return true;
 }
 
-/* ── Error handling ───────────────────────────────────────────────────── */
+/* Error handling */
 
 void SpiBus::handle_error(bool timeout)
 {

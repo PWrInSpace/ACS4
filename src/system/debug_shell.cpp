@@ -7,6 +7,7 @@
 
 #include "system/debug_shell.h"
 
+#include <cmath>
 #include <cstdlib>
 #include <cstring>
 #include <iterator>
@@ -22,12 +23,13 @@ extern "C" {
 }
 
 #include "drivers/iim42653.h"
+#include "drivers/mmc5983ma.h"
 #include "drivers/ms5611.h"
 #include "system/error_handler.h"
 #include "system/params.h"
 #include "utils/profiler.h"
 
-/* ── Version info ─────────────────────────────────────────────────────── */
+/* Wersja o info */
 
 #ifndef ACS4_VERSION
     #define ACS4_VERSION "0.1.0"
@@ -37,7 +39,7 @@ extern "C" {
     #define ACS4_GIT_HASH "unknown"
 #endif
 
-/* ── Shell commands ───────────────────────────────────────────────────── */
+/* Komendy shellowe */
 
 static void cmd_version(BaseSequentialStream *chp, int argc, char *argv[])
 {
@@ -199,7 +201,7 @@ static void cmd_sensor(BaseSequentialStream *chp, int argc, char *argv[])
 {
     if (argc == 0)
     {
-        chprintf(chp, "Usage: sensor imu | baro\r\n");
+        chprintf(chp, "Usage: sensor imu | baro | mag\r\n");
         return;
     }
 
@@ -255,14 +257,43 @@ static void cmd_sensor(BaseSequentialStream *chp, int argc, char *argv[])
         chprintf(chp, "Timestamp:   %lu us\r\n", s.timestamp_us);
         chprintf(chp, "Errors:      %lu\r\n", baro->error_count());
     }
+    else if (strcmp(argv[0], "mag") == 0)
+    {
+        auto *mag = acs::mag_instance();
+        if (mag == nullptr)
+        {
+            chprintf(chp, "MAG not available (no hardware or init failed)\r\n");
+            return;
+        }
+
+        acs::MagSample sample{};
+        if (!mag->read(sample))
+        {
+            chprintf(chp, "MAG read failed (errors: %lu)\r\n", mag->error_count());
+            return;
+        }
+
+        const auto mx = static_cast<double>(sample.field_ut[0]);
+        const auto my = static_cast<double>(sample.field_ut[1]);
+        const auto mz = static_cast<double>(sample.field_ut[2]);
+
+        chprintf(chp,
+                 "Field [uT]: mx=%+.1f  my=%+.1f  mz=%+.1f\r\n",
+                 mx, my, mz);
+        chprintf(chp,
+                 "Magnitude:  %.1f uT\r\n",
+                 sqrt(mx * mx + my * my + mz * mz));
+        chprintf(chp, "Timestamp:  %lu us\r\n", sample.timestamp_us);
+        chprintf(chp, "Errors:     %lu\r\n", mag->error_count());
+    }
     else
     {
         chprintf(chp, "Unknown sensor: %s\r\n", argv[0]);
-        chprintf(chp, "Available: imu, baro\r\n");
+        chprintf(chp, "Available: imu, baro, mag\r\n");
     }
 }
 
-/* ── Shell command table ──────────────────────────────────────────────── */
+/* Tablica komend shellowych */
 
 static const ShellCommand shell_commands[] = {
     {"version", cmd_version},
@@ -276,7 +307,7 @@ static const ShellCommand shell_commands[] = {
     {  nullptr,     nullptr}
 };
 
-/* ── Shell thread ─────────────────────────────────────────────────────── */
+/* Shell thread */
 
 static char shell_history_buf[SHELL_MAX_LINE_LENGTH * 4];
 
@@ -285,7 +316,7 @@ static THD_WORKING_AREA(waShell, 2048);
 namespace acs
 {
 
-/* ── Internal: launch shell thread with a given stream ─────────────────── */
+/*  Internal: Zlaunchuj shell thread z podanym streamem  */
 
 static void shell_launch(BaseSequentialStream *stream)
 {

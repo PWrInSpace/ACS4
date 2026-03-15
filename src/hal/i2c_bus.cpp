@@ -16,7 +16,7 @@ extern "C" {
 namespace acs
 {
 
-/* ── Init ─────────────────────────────────────────────────────────────── */
+/* Init */
 
 bool I2cBus::init(I2CDriver *driver, const I2CConfig &config, ioline_t scl_line, ioline_t sda_line)
 {
@@ -39,7 +39,7 @@ bool I2cBus::init(I2CDriver *driver, const I2CConfig &config, ioline_t scl_line,
     return true;
 }
 
-/* ── Write + Read (combined transaction) ──────────────────────────────── */
+/* Write + Read (combined transaction) */
 
 bool I2cBus::write_read(uint8_t addr, const uint8_t *tx, size_t tx_len, uint8_t *rx, size_t rx_len)
 {
@@ -59,7 +59,7 @@ bool I2cBus::write_read(uint8_t addr, const uint8_t *tx, size_t tx_len, uint8_t 
     return true;
 }
 
-/* ── Write only ───────────────────────────────────────────────────────── */
+/* Write only */
 
 bool I2cBus::write(uint8_t addr, const uint8_t *tx, size_t tx_len)
 {
@@ -79,7 +79,7 @@ bool I2cBus::write(uint8_t addr, const uint8_t *tx, size_t tx_len)
     return true;
 }
 
-/* ── Read only ────────────────────────────────────────────────────────── */
+/* Read only */
 
 bool I2cBus::read(uint8_t addr, uint8_t *rx, size_t rx_len)
 {
@@ -99,7 +99,7 @@ bool I2cBus::read(uint8_t addr, uint8_t *rx, size_t rx_len)
     return true;
 }
 
-/* ── Probe (detect device at address) ─────────────────────────────────── */
+/* Probe (detect device at address) */
 
 bool I2cBus::probe(uint8_t addr)
 {
@@ -123,7 +123,7 @@ bool I2cBus::probe(uint8_t addr)
     return true;
 }
 
-/* ── Bus Recovery (9-clock pulse method) ──────────────────────────────── */
+/* Bus Recovery (9-clock pulse method) */
 
 bool I2cBus::bus_recovery()
 {
@@ -198,7 +198,7 @@ bool I2cBus::bus_recovery()
     return sda_released;
 }
 
-/* ── Error handling ───────────────────────────────────────────────────── */
+/* Error handling */
 
 void I2cBus::handle_error()
 {
