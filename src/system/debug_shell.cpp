@@ -25,6 +25,7 @@ extern "C" {
 #include "drivers/iim42653.h"
 #include "drivers/mmc5983ma.h"
 #include "drivers/ms5611.h"
+#include "sensors/sensor_hub.h"
 #include "system/error_handler.h"
 #include "system/params.h"
 #include "utils/profiler.h"
@@ -197,99 +198,150 @@ static void cmd_param(BaseSequentialStream *chp, int argc, char *argv[])
     }
 }
 
+static void cmd_sensor_all(BaseSequentialStream *chp)
+{
+    const acs::SensorSnapshot s = acs::sensor_hub().snapshot();
+
+    chprintf(chp, "--- SensorSnapshot (imu_t=%lu us) ---\r\n", s.imu_timestamp_us);
+
+    chprintf(chp, "IMU  [%s]:\r\n", s.imu_valid ? "OK" : "--");
+    chprintf(chp,
+             "  Accel [m/s2]: %+.3f  %+.3f  %+.3f\r\n",
+             static_cast<double>(s.accel_mps2[0]),
+             static_cast<double>(s.accel_mps2[1]),
+             static_cast<double>(s.accel_mps2[2]));
+    chprintf(chp,
+             "  Gyro [rad/s]: %+.4f  %+.4f  %+.4f\r\n",
+             static_cast<double>(s.gyro_rads[0]),
+             static_cast<double>(s.gyro_rads[1]),
+             static_cast<double>(s.gyro_rads[2]));
+    chprintf(chp, "  Temp:         %.1f C\r\n", static_cast<double>(s.imu_temp_c));
+
+    chprintf(chp, "BARO [%s] fresh=%s:\r\n", s.baro_valid ? "OK" : "--", s.baro_fresh ? "Y" : "N");
+    chprintf(chp, "  Pressure:     %.1f Pa\r\n", static_cast<double>(s.pressure_pa));
+    chprintf(chp, "  Altitude:     %.2f m\r\n", static_cast<double>(s.altitude_m));
+    chprintf(chp, "  Temp:         %.1f C\r\n", static_cast<double>(s.baro_temp_c));
+
+    const auto mx = static_cast<double>(s.mag_ut[0]);
+    const auto my = static_cast<double>(s.mag_ut[1]);
+    const auto mz = static_cast<double>(s.mag_ut[2]);
+    chprintf(chp, "MAG  [%s] fresh=%s:\r\n", s.mag_valid ? "OK" : "--", s.mag_fresh ? "Y" : "N");
+    chprintf(chp,
+             "  Field [uT]:   %+.1f  %+.1f  %+.1f  |B|=%.1f\r\n",
+             mx,
+             my,
+             mz,
+             sqrt(mx * mx + my * my + mz * mz));
+}
+
+static void cmd_sensor_imu(BaseSequentialStream *chp)
+{
+    auto *imu = acs::imu_instance();
+    if (imu == nullptr)
+    {
+        chprintf(chp, "IMU not available (no hardware or init failed)\r\n");
+        return;
+    }
+
+    acs::ImuSample sample{};
+    if (!imu->read(sample))
+    {
+        chprintf(chp, "IMU read failed (errors: %lu)\r\n", imu->error_count());
+        return;
+    }
+
+    chprintf(chp,
+             "Accel [m/s2]: X=%+.3f  Y=%+.3f  Z=%+.3f\r\n",
+             static_cast<double>(sample.accel_mps2[0]),
+             static_cast<double>(sample.accel_mps2[1]),
+             static_cast<double>(sample.accel_mps2[2]));
+    chprintf(chp,
+             "Gyro [rad/s]: X=%+.4f  Y=%+.4f  Z=%+.4f\r\n",
+             static_cast<double>(sample.gyro_rads[0]),
+             static_cast<double>(sample.gyro_rads[1]),
+             static_cast<double>(sample.gyro_rads[2]));
+    chprintf(chp, "Temp:         %.1f C\r\n", static_cast<double>(sample.temp_degc));
+    chprintf(chp, "Timestamp:    %lu us\r\n", sample.timestamp_us);
+    chprintf(chp, "Errors:       %lu\r\n", imu->error_count());
+}
+
+static void cmd_sensor_baro(BaseSequentialStream *chp)
+{
+    auto *baro = acs::baro_instance();
+    if (baro == nullptr)
+    {
+        chprintf(chp, "BARO not available (no hardware or init failed)\r\n");
+        return;
+    }
+
+    if (!baro->has_new_data())
+    {
+        chprintf(chp, "BARO: no new data (errors: %lu)\r\n", baro->error_count());
+        return;
+    }
+
+    const acs::BaroSample s = baro->sample();
+    chprintf(chp, "Pressure:    %.2f Pa\r\n", static_cast<double>(s.pressure_pa));
+    chprintf(chp, "Temperature: %.2f C\r\n", static_cast<double>(s.temperature_c));
+    chprintf(chp, "Altitude:    %.2f m\r\n", static_cast<double>(s.altitude_m));
+    chprintf(chp, "Timestamp:   %lu us\r\n", s.timestamp_us);
+    chprintf(chp, "Errors:      %lu\r\n", baro->error_count());
+}
+
+static void cmd_sensor_mag(BaseSequentialStream *chp)
+{
+    auto *mag = acs::mag_instance();
+    if (mag == nullptr)
+    {
+        chprintf(chp, "MAG not available (no hardware or init failed)\r\n");
+        return;
+    }
+
+    acs::MagSample sample{};
+    if (!mag->read(sample))
+    {
+        chprintf(chp, "MAG read failed (errors: %lu)\r\n", mag->error_count());
+        return;
+    }
+
+    const auto mx = static_cast<double>(sample.field_ut[0]);
+    const auto my = static_cast<double>(sample.field_ut[1]);
+    const auto mz = static_cast<double>(sample.field_ut[2]);
+
+    chprintf(chp, "Field [uT]: mx=%+.1f  my=%+.1f  mz=%+.1f\r\n", mx, my, mz);
+    chprintf(chp, "Magnitude:  %.1f uT\r\n", sqrt(mx * mx + my * my + mz * mz));
+    chprintf(chp, "Timestamp:  %lu us\r\n", sample.timestamp_us);
+    chprintf(chp, "Errors:     %lu\r\n", mag->error_count());
+}
+
 static void cmd_sensor(BaseSequentialStream *chp, int argc, char *argv[])
 {
     if (argc == 0)
     {
-        chprintf(chp, "Usage: sensor imu | baro | mag\r\n");
+        chprintf(chp, "Usage: sensor imu | baro | mag | all\r\n");
         return;
     }
 
-    if (strcmp(argv[0], "imu") == 0)
+    if (strcmp(argv[0], "all") == 0)
     {
-        auto *imu = acs::imu_instance();
-        if (imu == nullptr)
-        {
-            chprintf(chp, "IMU not available (no hardware or init failed)\r\n");
-            return;
-        }
-
-        acs::ImuSample sample{};
-        if (!imu->read(sample))
-        {
-            chprintf(chp, "IMU read failed (errors: %lu)\r\n", imu->error_count());
-            return;
-        }
-
-        chprintf(chp,
-                 "Accel [m/s2]: X=%+.3f  Y=%+.3f  Z=%+.3f\r\n",
-                 static_cast<double>(sample.accel_mps2[0]),
-                 static_cast<double>(sample.accel_mps2[1]),
-                 static_cast<double>(sample.accel_mps2[2]));
-        chprintf(chp,
-                 "Gyro [rad/s]: X=%+.4f  Y=%+.4f  Z=%+.4f\r\n",
-                 static_cast<double>(sample.gyro_rads[0]),
-                 static_cast<double>(sample.gyro_rads[1]),
-                 static_cast<double>(sample.gyro_rads[2]));
-        chprintf(chp, "Temp:         %.1f C\r\n", static_cast<double>(sample.temp_degc));
-        chprintf(chp, "Timestamp:    %lu us\r\n", sample.timestamp_us);
-        chprintf(chp, "Errors:       %lu\r\n", imu->error_count());
+        cmd_sensor_all(chp);
+    }
+    else if (strcmp(argv[0], "imu") == 0)
+    {
+        cmd_sensor_imu(chp);
     }
     else if (strcmp(argv[0], "baro") == 0)
     {
-        auto *baro = acs::baro_instance();
-        if (baro == nullptr)
-        {
-            chprintf(chp, "BARO not available (no hardware or init failed)\r\n");
-            return;
-        }
-
-        if (!baro->has_new_data())
-        {
-            chprintf(chp, "BARO: no new data (errors: %lu)\r\n", baro->error_count());
-            return;
-        }
-
-        const acs::BaroSample s = baro->sample();
-        chprintf(chp, "Pressure:    %.2f Pa\r\n", static_cast<double>(s.pressure_pa));
-        chprintf(chp, "Temperature: %.2f C\r\n", static_cast<double>(s.temperature_c));
-        chprintf(chp, "Altitude:    %.2f m\r\n", static_cast<double>(s.altitude_m));
-        chprintf(chp, "Timestamp:   %lu us\r\n", s.timestamp_us);
-        chprintf(chp, "Errors:      %lu\r\n", baro->error_count());
+        cmd_sensor_baro(chp);
     }
     else if (strcmp(argv[0], "mag") == 0)
     {
-        auto *mag = acs::mag_instance();
-        if (mag == nullptr)
-        {
-            chprintf(chp, "MAG not available (no hardware or init failed)\r\n");
-            return;
-        }
-
-        acs::MagSample sample{};
-        if (!mag->read(sample))
-        {
-            chprintf(chp, "MAG read failed (errors: %lu)\r\n", mag->error_count());
-            return;
-        }
-
-        const auto mx = static_cast<double>(sample.field_ut[0]);
-        const auto my = static_cast<double>(sample.field_ut[1]);
-        const auto mz = static_cast<double>(sample.field_ut[2]);
-
-        chprintf(chp,
-                 "Field [uT]: mx=%+.1f  my=%+.1f  mz=%+.1f\r\n",
-                 mx, my, mz);
-        chprintf(chp,
-                 "Magnitude:  %.1f uT\r\n",
-                 sqrt(mx * mx + my * my + mz * mz));
-        chprintf(chp, "Timestamp:  %lu us\r\n", sample.timestamp_us);
-        chprintf(chp, "Errors:     %lu\r\n", mag->error_count());
+        cmd_sensor_mag(chp);
     }
     else
     {
         chprintf(chp, "Unknown sensor: %s\r\n", argv[0]);
-        chprintf(chp, "Available: imu, baro, mag\r\n");
+        chprintf(chp, "Available: imu, baro, mag, all\r\n");
     }
 }
 

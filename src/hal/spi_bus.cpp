@@ -209,6 +209,42 @@ bool SpiBus::read_registers(ioline_t         cs_line,
     return true;
 }
 
+/* Large burst register read (no size limit) */
+
+bool SpiBus::read_burst(ioline_t         cs_line,
+                        uint8_t          reg,
+                        uint8_t         *buf,
+                        size_t           len,
+                        const SPIConfig &config)
+{
+    if (!initialized_ || buf == nullptr || len == 0)
+    {
+        return false;
+    }
+
+    const BusGuard bus(driver_, &config);
+    const CsGuard  cs(cs_line);
+
+    auto  addr   = static_cast<uint8_t>(reg | 0x80U);
+    msg_t status = spiSend(driver_, 1, &addr);
+
+    if (status != MSG_OK)
+    {
+        handle_error(status == MSG_TIMEOUT);
+        return false;
+    }
+
+    status = spiReceive(driver_, len, buf);
+
+    if (status != MSG_OK)
+    {
+        handle_error(status == MSG_TIMEOUT);
+        return false;
+    }
+
+    return true;
+}
+
 /* Error handling */
 
 void SpiBus::handle_error(bool timeout)

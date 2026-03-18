@@ -44,10 +44,10 @@ namespace acs
 
 struct ImuSample
 {
-    std::array<float, 3> accel_mps2; /* X, Y, Z — body frame, m/s² */
-    std::array<float, 3> gyro_rads;  /* X, Y, Z — body frame, rad/s */
-    float                temp_degc;     /* die temperature, °C (NaN if sensor data not ready) */
-    uint32_t             timestamp_us;  /* host µs — DWT (register) or reconstructed (FIFO) */
+    std::array<float, 3> accel_mps2;   /* X, Y, Z — body frame, m/s² */
+    std::array<float, 3> gyro_rads;    /* X, Y, Z — body frame, rad/s */
+    float                temp_degc;    /* die temperature, °C (NaN if sensor data not ready) */
+    uint32_t             timestamp_us; /* host µs — DWT (register) or reconstructed (FIFO) */
 };
 
 /* ======================
@@ -597,8 +597,8 @@ class Iim42653
      * @return true on success.
      * @pre Sensors must be OFF (call before configure(), or disable sensors first).
      */
-    [[nodiscard]] bool
-    set_offsets(const std::array<float, 3> &gyro_bias_dps, const std::array<float, 3> &accel_bias_g);
+    [[nodiscard]] bool set_offsets(const std::array<float, 3> &gyro_bias_dps,
+                                   const std::array<float, 3> &accel_bias_g);
 
     /**
      * @brief Check if the driver has been successfully initialized.
@@ -622,6 +622,7 @@ class Iim42653
     [[nodiscard]] bool                   write_reg(uint8_t reg, uint8_t value);
     [[nodiscard]] std::optional<uint8_t> read_reg(uint8_t reg);
     [[nodiscard]] bool                   read_regs(uint8_t start_reg, uint8_t *buf, size_t len);
+    [[nodiscard]] bool                   read_bulk(uint8_t start_reg, uint8_t *buf, size_t len);
 
     /** Select register bank (0–4). Caches current bank to avoid
      *  redundant writes. Returns to bank 0 after bank operations. */

@@ -205,13 +205,13 @@ class Ms5611
     ioline_t         cs_line_ = 0;
     const SPIConfig *spi_cfg_ = nullptr;
 
-    State         state_       = State::IDLE;
-    bool          initialized_ = false;
-    volatile bool new_data_    = false;
-    float         qnh_pa_      = 101325.0f;
+    State state_       = State::IDLE;
+    bool  initialized_ = false;
+    bool  new_data_    = false;
+    float qnh_pa_      = 101325.0f;
 
-    Ms5611Osr osr_           = Ms5611Osr::OSR_4096;
-    uint32_t  conv_time_us_  = 0; /* cached conversion_time_us(osr_) */
+    Ms5611Osr osr_          = Ms5611Osr::OSR_4096;
+    uint32_t  conv_time_us_ = 0; /* cached conversion_time_us(osr_) */
 
     uint16_t cal_[6] = {}; /* C1–C6 calibration coefficients (PROM addresses 1–6) */
 

@@ -205,12 +205,12 @@ struct Mmc5983maConfig
 class Mmc5983ma
 {
   public:
-    Mmc5983ma()                               = default;
-    ~Mmc5983ma()                              = default;
-    Mmc5983ma(const Mmc5983ma &)              = delete;
-    Mmc5983ma &operator=(const Mmc5983ma &)   = delete;
-    Mmc5983ma(Mmc5983ma &&)                   = delete;
-    Mmc5983ma &operator=(Mmc5983ma &&)        = delete;
+    Mmc5983ma()                             = default;
+    ~Mmc5983ma()                            = default;
+    Mmc5983ma(const Mmc5983ma &)            = delete;
+    Mmc5983ma &operator=(const Mmc5983ma &) = delete;
+    Mmc5983ma(Mmc5983ma &&)                 = delete;
+    Mmc5983ma &operator=(Mmc5983ma &&)      = delete;
 
     /**
      * @brief Initialize the magnetometer.

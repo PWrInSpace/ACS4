@@ -154,7 +154,10 @@ uint32_t Ms5611::conversion_time_us(Ms5611Osr osr)
 
 bool Ms5611::has_new_data() const
 {
-    return new_data_;
+    chSysLock();
+    const bool result = new_data_;
+    chSysUnlock();
+    return result;
 }
 
 BaroSample Ms5611::sample()
@@ -172,9 +175,9 @@ BaroSample Ms5611::sample()
 
 bool Ms5611::init(SpiBus &spi, ioline_t cs_line, const SPIConfig &spi_cfg, const Ms5611Config &cfg)
 {
-    spi_     = &spi;
-    cs_line_ = cs_line;
-    spi_cfg_ = &spi_cfg;
+    spi_          = &spi;
+    cs_line_      = cs_line;
+    spi_cfg_      = &spi_cfg;
     osr_          = cfg.osr;
     qnh_pa_       = cfg.qnh_pa;
     conv_time_us_ = conversion_time_us(osr_);
