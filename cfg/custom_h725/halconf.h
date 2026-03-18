@@ -52,7 +52,7 @@
 /*---------------------------------------------------------------------------*/
 
 #define PAL_USE_CALLBACKS                   FALSE
-#define PAL_USE_WAIT                        FALSE
+#define PAL_USE_WAIT                        TRUE
 
 /*---------------------------------------------------------------------------*/
 /* SERIAL driver settings                                                    */

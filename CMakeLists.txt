@@ -190,6 +190,7 @@ set(APP_SOURCES
     src/system/usb_cdc.cpp
     src/system/watchdog.cpp
     src/sensors/sensor_hub.cpp
+    src/sensors/sensor_threads.cpp
     src/utils/profiler.cpp
 )
 
