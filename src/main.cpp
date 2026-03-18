@@ -28,6 +28,7 @@ extern "C" {
 #include "drivers/iim42653.h"
 #include "drivers/mmc5983ma.h"
 #include "drivers/ms5611.h"
+#include "sensors/sensor_threads.h"
 #include "system/debug_shell.h"
 #include "system/error_handler.h"
 #include "system/watchdog.h"
@@ -230,6 +231,9 @@ int main()
         chprintf(serial, "SPI bus: init FAILED\r\n");
     }
 #endif
+
+    /* Start sensor acquisition threads (custom PCB only — no-op on Nucleo). */
+    acs::start_sensor_threads();
 
     /* Create worker threads. */
     chThdCreateStatic(waBlinker, sizeof(waBlinker), NORMALPRIO, Blinker, nullptr);
