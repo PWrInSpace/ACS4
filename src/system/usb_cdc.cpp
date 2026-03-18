@@ -20,20 +20,20 @@ extern "C" {
 /* Only compile for custom PCB target. */
 #if defined(STM32H725xx) && HAL_USE_USB && HAL_USE_SERIAL_USB
 
-/* ── Endpoint numbers ─────────────────────────────────────────────────── */
+/* Endpoint numbers */
 
 static constexpr usbep_t USB_CDC_DATA_EP      = 1; /* Bulk IN+OUT       */
 static constexpr usbep_t USB_CDC_INTERRUPT_EP = 2; /* Interrupt IN      */
 
-/* ── SDU1 driver instance ─────────────────────────────────────────────── */
+/* SDU1 driver instance */
 
 static SerialUSBDriver SDU1;
 
-/* ═══════════════════════════════════════════════════════════════════════
+/* =================
  * USB Descriptors
- * ═══════════════════════════════════════════════════════════════════════ */
+ * ================= */
 
-/* ── Device Descriptor ────────────────────────────────────────────────── */
+/* Device Descriptor */
 
 static const uint8_t vcom_device_descriptor_data[18] = {
     USB_DESC_DEVICE(0x0110, /* bcdUSB (1.1)               */
@@ -53,7 +53,7 @@ static const uint8_t vcom_device_descriptor_data[18] = {
 static const USBDescriptor vcom_device_descriptor = {sizeof vcom_device_descriptor_data,
                                                      vcom_device_descriptor_data};
 
-/* ── Configuration Descriptor (CDC ACM, 2 interfaces) ────────────────── */
+/* Configuration Descriptor (CDC ACM, 2 interfaces) */
 
 static const uint8_t vcom_configuration_descriptor_data[67] = {
     /* Configuration Descriptor. */
@@ -131,7 +131,7 @@ static const USBDescriptor vcom_configuration_descriptor = {
     sizeof vcom_configuration_descriptor_data,
     vcom_configuration_descriptor_data};
 
-/* ── String Descriptors ───────────────────────────────────────────────── */
+/* String Descriptors */
 
 /* Language ID (US English). */
 static const uint8_t vcom_string0[] = {USB_DESC_BYTE(4),
@@ -231,9 +231,9 @@ static const USBDescriptor vcom_strings[] = {
     {sizeof vcom_string3, vcom_string3}
 };
 
-/* ═══════════════════════════════════════════════════════════════════════
+/* ===============
  * USB Callbacks
- * ═══════════════════════════════════════════════════════════════════════ */
+ * =============== */
 
 static const USBDescriptor *
 get_descriptor(USBDriver *usbp, uint8_t dtype, uint8_t dindex, uint16_t lang)
@@ -258,7 +258,7 @@ get_descriptor(USBDriver *usbp, uint8_t dtype, uint8_t dindex, uint16_t lang)
     return nullptr;
 }
 
-/* ── Endpoint state & config ──────────────────────────────────────────── */
+/* Endpoint state & config */
 
 static USBInEndpointState  ep1instate;
 static USBOutEndpointState ep1outstate;
@@ -291,7 +291,7 @@ static const USBEndpointConfig ep2config = {
     nullptr                  /* setup_buf        */
 };
 
-/* ── USB event handler ────────────────────────────────────────────────── */
+/* USB event handler */
 
 static void usb_event(USBDriver *usbp, usbevent_t event)
 {
@@ -329,7 +329,7 @@ static void usb_event(USBDriver *usbp, usbevent_t event)
     }
 }
 
-/* ── SOF handler (required for CDC timing) ────────────────────────────── */
+/* SOF handler (required for CDC timing) */
 
 static void sof_handler(USBDriver *usbp)
 {
@@ -339,7 +339,7 @@ static void sof_handler(USBDriver *usbp)
     osalSysUnlockFromISR();
 }
 
-/* ── USB driver config ────────────────────────────────────────────────── */
+/* USB driver config */
 
 static const USBConfig usbcfg = {
     usb_event,       /* event_cb          */
@@ -348,7 +348,7 @@ static const USBConfig usbcfg = {
     sof_handler      /* sof_cb            */
 };
 
-/* ── Serial-over-USB config ───────────────────────────────────────────── */
+/* Serial-over-USB config */
 /*
  * H725 has only OTG_HS, which is USBD2 in ChibiOS.
  * OTG_HS runs in FS mode via internal FS PHY.
@@ -360,9 +360,9 @@ static const SerialUSBConfig serusbcfg = {
     USB_CDC_INTERRUPT_EP /* int_in   endpoint             */
 };
 
-/* ═══════════════════════════════════════════════════════════════════════
+/* ===========
  * Public API
- * ═══════════════════════════════════════════════════════════════════════ */
+ * =========== */
 
 namespace acs
 {

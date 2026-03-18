@@ -93,6 +93,11 @@ bool Iim42653::read_regs(uint8_t start_reg, uint8_t *buf, size_t len)
     return spi_->read_registers(cs_line_, start_reg, buf, len, *spi_cfg_);
 }
 
+bool Iim42653::read_bulk(uint8_t start_reg, uint8_t *buf, size_t len)
+{
+    return spi_->read_burst(cs_line_, start_reg, buf, len, *spi_cfg_);
+}
+
 bool Iim42653::select_bank(uint8_t bank)
 {
     if (bank == current_bank_)
@@ -806,7 +811,7 @@ size_t Iim42653::read_fifo(ImuSample *samples, size_t max_count)
      */
     const size_t total_bytes = n_packets * kFifoPacketSize;
 
-    if (!read_regs(FIFO_DATA, fifo_bulk_buf_, total_bytes))
+    if (!read_bulk(FIFO_DATA, fifo_bulk_buf_, total_bytes))
     {
         report_error();
         return 0;
@@ -881,7 +886,7 @@ bool Iim42653::flush_fifo()
  * ============================ */
 
 bool Iim42653::set_offsets(const std::array<float, 3> &gyro_bias_dps,
-                          const std::array<float, 3> &accel_bias_g)
+                           const std::array<float, 3> &accel_bias_g)
 {
     if (!initialized_)
     {

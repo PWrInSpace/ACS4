@@ -1,5 +1,5 @@
 /*
- * ACS4 Flight Computer — MS5611 Niezalezna platformowo matma 
+ * ACS4 Flight Computer — MS5611 Niezalezna platformowo matma
  *
  */
 
@@ -24,7 +24,7 @@ bool verify_crc4(const uint16_t prom[8])
     uint16_t work[8];
     std::copy(prom, prom + 8, work);
 
-    work[7] &= 0xFF00; 
+    work[7] &= 0xFF00;
 
     uint16_t remainder = 0;
     for (int cnt = 0; cnt < 16; ++cnt)

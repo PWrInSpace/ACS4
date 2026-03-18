@@ -16,7 +16,7 @@ extern "C" {
 namespace acs
 {
 
-/* ── Error state ──────────────────────────────────────────────────────── */
+/* Error state */
 
 struct ErrorEntry
 {
@@ -26,7 +26,7 @@ struct ErrorEntry
 
 static ErrorEntry s_errors[static_cast<int>(ErrorCode::COUNT)] = {};
 
-/* ── Name lookup ──────────────────────────────────────────────────────── */
+/* Name lookup */
 
 // clang-format off
 static constexpr const char *const s_error_names[] = {
@@ -58,7 +58,7 @@ static_assert(sizeof(s_error_names) / sizeof(s_error_names[0])
                   == static_cast<int>(ErrorCode::COUNT),
               "s_error_names out of sync with ErrorCode enum");
 
-/* ── Critical error set ───────────────────────────────────────────────── */
+/* Critical error set */
 
 bool is_critical(ErrorCode code)
 {
@@ -75,7 +75,7 @@ bool is_critical(ErrorCode code)
     }
 }
 
-/* ── Public API ───────────────────────────────────────────────────────── */
+/* Public API */
 
 void error_report(ErrorCode code)
 {
@@ -98,7 +98,11 @@ uint32_t error_count(ErrorCode code)
     {
         return 0;
     }
-    return s_errors[idx].count;
+
+    chSysLock();
+    const uint32_t count = s_errors[idx].count;
+    chSysUnlock();
+    return count;
 }
 
 const char *error_name(ErrorCode code)

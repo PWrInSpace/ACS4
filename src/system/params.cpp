@@ -15,31 +15,31 @@ extern "C" {
 namespace acs
 {
 
-/* ── Parameter table ──────────────────────────────────────────────────── */
+/* Parameter table */
 /* Add new parameters here. Keep alphabetically grouped by subsystem.     */
 
 // clang-format off
 static ParamEntry s_params[] = {
-    /* ── Control: Roll ──────────────────────────────────────────────── */
+    /* Control: Roll */
     {"ctrl.kp_roll",            1.0f,   1.0f,   0.0f,   50.0f},
     {"ctrl.ki_roll",            0.0f,   0.0f,   0.0f,   10.0f},
     {"ctrl.kd_roll",            0.1f,   0.1f,   0.0f,   10.0f},
 
-    /* ── Control: Pitch ─────────────────────────────────────────────── */
+    /* Control: Pitch */
     {"ctrl.kp_pitch",           1.0f,   1.0f,   0.0f,   50.0f},
     {"ctrl.ki_pitch",           0.0f,   0.0f,   0.0f,   10.0f},
     {"ctrl.kd_pitch",           0.1f,   0.1f,   0.0f,   10.0f},
 
-    /* ── Control: Yaw ───────────────────────────────────────────────── */
+    /* Control: Yaw */
     {"ctrl.kp_yaw",             1.0f,   1.0f,   0.0f,   50.0f},
     {"ctrl.ki_yaw",             0.0f,   0.0f,   0.0f,   10.0f},
     {"ctrl.kd_yaw",             0.1f,   0.1f,   0.0f,   10.0f},
 
-    /* ── Navigation / EKF ───────────────────────────────────────────── */
+    /* Navigation / EKF */
     {"nav.accel_noise",         0.5f,   0.5f,   0.001f, 10.0f},
     {"nav.gyro_noise",          0.01f,  0.01f,  0.0001f, 1.0f},
 
-    /* ── FSM thresholds ─────────────────────────────────────────────── */
+    /* FSM thresholds */
     {"fsm.liftoff_accel_g",     3.0f,   3.0f,   1.5f,   20.0f},
     {"fsm.liftoff_time_ms",     100.0f, 100.0f, 50.0f,  500.0f},
     {"fsm.apogee_vel_threshold", 5.0f,  5.0f,   1.0f,   50.0f},
@@ -48,7 +48,7 @@ static ParamEntry s_params[] = {
 
 static constexpr int PARAM_COUNT = static_cast<int>(sizeof(s_params) / sizeof(s_params[0]));
 
-/* ── Find by name ─────────────────────────────────────────────────────── */
+/* Find by name */
 
 static ParamEntry *find_param(const char *name)
 {
@@ -62,7 +62,7 @@ static ParamEntry *find_param(const char *name)
     return nullptr;
 }
 
-/* ── Public API ───────────────────────────────────────────────────────── */
+/* Public API */
 
 bool param_get(const char *name, float &out)
 {

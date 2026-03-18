@@ -164,9 +164,10 @@ class SpiBus
     write_register(ioline_t cs_line, uint8_t reg, uint8_t value, const SPIConfig &config);
 
     /**
-     * @brief Read a burst of registers starting at `reg`.
+     * @brief Read a burst of registers starting at `reg` (small reads, max 32 B).
      *
      * Sends (reg | 0x80) then clocks out `len` bytes into `buf`.
+     * Uses internal stack buffers — for larger reads use read_burst().
      *
      * @param cs_line  PAL line for chip select.
      * @param reg      Starting register address (bit 7 set automatically).
@@ -180,6 +181,23 @@ class SpiBus
                                       uint8_t         *buf,
                                       size_t           len,
                                       const SPIConfig &config);
+
+    /**
+     * @brief Read a large burst of data from a register (no size limit).
+     *
+     * Unlike read_registers() which uses internal stack buffers (max 32 B),
+     * this method uses split spiSend + spiReceive within one CS assertion,
+     * supporting arbitrarily large reads (e.g. FIFO drains).
+     *
+     * @param cs_line  PAL line for chip select.
+     * @param reg      Starting register address (bit 7 set automatically).
+     * @param buf      Destination buffer (caller-allocated).
+     * @param len      Number of data bytes to read.
+     * @param config   SPI configuration.
+     * @return true on success.
+     */
+    [[nodiscard]] bool
+    read_burst(ioline_t cs_line, uint8_t reg, uint8_t *buf, size_t len, const SPIConfig &config);
 
     /**
      * @brief Get the number of failed transfers since init.
