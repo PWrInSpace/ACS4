@@ -35,7 +35,10 @@ extern "C" {
 #include "utils/timestamp.h"
 
 #if defined(STM32H725xx)
+    #include "hal/sdmmc.h"
     #include "hal/spi_bus.h"
+    #include "logger/flight_logger.h"
+    #include "logger/ram_log.h"
     #include "system/usb_cdc.h"
 #endif
 
@@ -143,6 +146,19 @@ static THD_FUNCTION(Blinker, arg)
 }
 
 /*---------------------------------------------------------------------------*/
+/* Logger thread (custom PCB only — needs SD card)                           */
+/*---------------------------------------------------------------------------*/
+
+#if defined(STM32H725xx)
+static THD_WORKING_AREA(waLogger, 2048);
+
+static THD_FUNCTION(LoggerThread, arg)
+{
+    acs::logger_thread(arg);
+}
+#endif
+
+/*---------------------------------------------------------------------------*/
 /* Application entry point                                                   */
 /*---------------------------------------------------------------------------*/
 
@@ -234,6 +250,25 @@ int main()
 
     /* Start sensor acquisition threads (custom PCB only — no-op on Nucleo). */
     acs::start_sensor_threads();
+
+    /* Initialize SD card and logger (custom PCB only). */
+#if defined(STM32H725xx)
+    acs::sdmmc_init();
+    acs::ram_log_init();
+
+    if (acs::sdmmc_mount())
+    {
+        chprintf(serial, "SD:   mounted OK\r\n");
+        acs::logger_init();
+    }
+    else
+    {
+        chprintf(serial, "SD:   mount failed (card %s)\r\n",
+                 acs::sdmmc_card_inserted() ? "detected" : "not detected");
+    }
+
+    chThdCreateStatic(waLogger, sizeof(waLogger), NORMALPRIO - 20, LoggerThread, nullptr);
+#endif
 
     /* Create worker threads. */
     chThdCreateStatic(waBlinker, sizeof(waBlinker), NORMALPRIO, Blinker, nullptr);

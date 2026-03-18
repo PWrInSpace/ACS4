@@ -172,6 +172,24 @@ set(CHIBIOS_SHELL_C
     ${CHIBIOS}/os/various/shell/shell_cmd.c
 )
 
+# ── FatFs filesystem (from ChibiOS ext — custom PCB only) ────────────
+if(ACS4_TARGET STREQUAL "CUSTOM_H725")
+    set(CHIBIOS_FATFS_C
+        ${CHIBIOS}/os/various/fatfs_bindings/fatfs_diskio.c
+        ${CHIBIOS}/os/various/fatfs_bindings/fatfs_syscall.c
+        ${CHIBIOS}/ext/fatfs/source/ff.c
+        ${CHIBIOS}/ext/fatfs/source/ffunicode.c
+    )
+    set(APP_LOGGER_SOURCES
+        src/hal/sdmmc.cpp
+        src/logger/flight_logger.cpp
+        src/logger/ram_log.cpp
+    )
+else()
+    set(CHIBIOS_FATFS_C "")
+    set(APP_LOGGER_SOURCES "")
+endif()
+
 # =============================================================================
 # Application Sources
 # =============================================================================
@@ -283,11 +301,19 @@ add_executable(${PROJECT_NAME}
     ${CHIBIOS_OSLIB_C}
     # C — ChibiOS Shell
     ${CHIBIOS_SHELL_C}
+    # C — FatFs
+    ${CHIBIOS_FATFS_C}
     # C++ — Application
     ${APP_SOURCES}
+    ${APP_LOGGER_SOURCES}
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${CHIBIOS_INCLUDE_DIRS})
+
+if(ACS4_TARGET STREQUAL "CUSTOM_H725")
+    target_include_directories(${PROJECT_NAME} PRIVATE ${CHIBIOS}/ext/fatfs/source)
+endif()
+
 target_compile_definitions(${PROJECT_NAME} PRIVATE
     ${MCU_DEFINE}
     CORTEX_USE_FPU=TRUE
@@ -316,6 +342,13 @@ set_source_files_properties(
     ${CHIBIOS_SHELL_C}
     PROPERTIES COMPILE_OPTIONS "-Wstrict-prototypes"
 )
+
+if(CHIBIOS_FATFS_C)
+    set_source_files_properties(
+        ${CHIBIOS_FATFS_C}
+        PROPERTIES COMPILE_OPTIONS "-Wstrict-prototypes"
+    )
+endif()
 
 # ── C++ flags (application code) ─────────────────────────────────────────
 target_compile_options(${PROJECT_NAME} PRIVATE
