@@ -52,7 +52,10 @@ The firmware is built upon an embedded framework designed for high-performance c
 | `cmake` | ≥ 3.20 | `sudo apt install cmake` |
 | `ninja-build` | any | `sudo apt install ninja-build` |
 | `openocd` | any | `sudo apt install openocd` |
+| `p7zip-full` | any | `sudo apt install p7zip-full` |
 | `clang-tidy` | ≥ 18 | `sudo apt install clang-tidy-18` |
+
+> `p7zip-full` is required only for the **CUSTOM_H725** target. CMake automatically extracts the FatFs archive (`lib/chibios/ext/fatfs-0.14b_patched.7z`) on first configure if the source directory is missing.
 
 **For unit tests only:** a host C++17 compiler (`g++` or `clang++`). Google Test is fetched automatically by CMake.
 

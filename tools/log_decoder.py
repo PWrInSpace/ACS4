@@ -46,7 +46,6 @@ MSG_CTRL = 0x03
 MSG_BARO = 0x04
 MSG_MAG = 0x05
 MSG_EVENT = 0x06
-MSG_PARAMS = 0x07
 
 # struct formats (little-endian)
 FMT_HEADER = "<BI"  # msg_id(u8), timestamp_us(u32)
@@ -74,7 +73,6 @@ MSG_NAMES: dict[int, str] = {
     MSG_BARO: "BARO",
     MSG_MAG: "MAG",
     MSG_EVENT: "EVENT",
-    MSG_PARAMS: "PARAMS",
 }
 
 

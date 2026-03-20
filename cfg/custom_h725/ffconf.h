@@ -31,7 +31,7 @@
 /* ── Locale and namespace ────────────────────────────────────────────────── */
 
 #define FF_CODE_PAGE        437
-#define FF_USE_LFN          2
+#define FF_USE_LFN          0
 #define FF_MAX_LFN          64
 #define FF_LFN_UNICODE      0
 #define FF_LFN_BUF          64
@@ -56,7 +56,7 @@
 #define FF_FS_NORTC         1
 #define FF_NORTC_MON        1
 #define FF_NORTC_MDAY       1
-#define FF_NORTC_YEAR       2025
+#define FF_NORTC_YEAR       2026
 #define FF_FS_NOFSINFO      0
 
 #define FF_FS_LOCK          0

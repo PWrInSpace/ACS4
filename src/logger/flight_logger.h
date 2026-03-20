@@ -71,7 +71,7 @@ void logger_stop();
 /**
  * @brief Append a log record (any packed struct from log_format.h).
  *
- * Safe to call from any thread or ISR context (uses chSysLock).
+ * Safe to call from any thread context (uses chSysLock/chSysUnlock).
  * The record is memcpy'd into the active buffer. If the buffer is full
  * and the inactive buffer is also not yet flushed, the record is dropped
  * and overflow_count is incremented.

@@ -38,7 +38,7 @@ bool sdmmc_mount()
 
     if (sdcConnect(&SDCD1) != HAL_SUCCESS)
     {
-        error_report(ErrorCode::SD_WRITE_FAIL);
+        error_report(ErrorCode::SD_MOUNT_FAIL);
         return false;
     }
 
@@ -46,7 +46,7 @@ bool sdmmc_mount()
     if (res != FR_OK)
     {
         sdcDisconnect(&SDCD1);
-        error_report(ErrorCode::SD_WRITE_FAIL);
+        error_report(ErrorCode::SD_MOUNT_FAIL);
         return false;
     }
 

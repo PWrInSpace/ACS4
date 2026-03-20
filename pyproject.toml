@@ -48,7 +48,7 @@ select = [
 ]
 ignore = [
     "ANN401",  # dynamically typed expressions (Any)
-    "S101",    # assert usage (fine in tools/tests)
+    "S101",    # assert usage
 ]
 
 [tool.ruff.lint.per-file-ignores]

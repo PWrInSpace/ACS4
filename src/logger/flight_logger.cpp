@@ -31,8 +31,9 @@ static constexpr size_t BUF_SIZE = 16384;
 
 static uint8_t s_buf[2][BUF_SIZE] __attribute__((aligned(4)));
 
-static volatile uint8_t  s_active   = 0;
-static volatile size_t   s_write_pos = 0;
+static volatile uint8_t  s_active        = 0;
+static volatile size_t   s_write_pos     = 0;
+static volatile size_t   s_flush_len     = 0;
 static volatile bool     s_flush_pending = false;
 
 static binary_semaphore_t s_flush_sem;
@@ -84,10 +85,11 @@ bool logger_init()
 {
     chBSemObjectInit(&s_flush_sem, true);
 
-    s_active       = 0;
-    s_write_pos    = 0;
+    s_active        = 0;
+    s_write_pos     = 0;
+    s_flush_len     = 0;
     s_flush_pending = false;
-    s_state        = LoggerState::IDLE;
+    s_state         = LoggerState::IDLE;
     s_records      = 0;
     s_bytes        = 0;
     s_flushes      = 0;
@@ -133,6 +135,7 @@ bool logger_start()
 
     s_active        = 0;
     s_write_pos     = 0;
+    s_flush_len     = 0;
     s_flush_pending = false;
     s_records       = 0;
     s_bytes         = sizeof(LogFileHeader);
@@ -168,8 +171,8 @@ void logger_stop()
         s_bytes += bw;
     }
 
-    /* Wait for any pending flush to complete. */
-    if (s_flush_pending)
+    /* Wait for any pending flush to complete (up to 1 s). */
+    for (int i = 0; i < 20 && s_flush_pending; i++)
     {
         chThdSleepMilliseconds(50);
     }
@@ -209,6 +212,7 @@ void logger_log(const void *data, size_t len)
         }
 
         /* Swap buffers and signal the flush thread. */
+        s_flush_len     = s_write_pos;
         s_flush_pending = true;
         s_active ^= 1;
         s_write_pos = 0;
@@ -292,11 +296,12 @@ void logger_thread(void *arg)
         }
 
         uint8_t flush_buf = s_active ^ 1;
+        size_t  flush_len = s_flush_len;
 
         UINT    bw  = 0;
-        FRESULT res = f_write(&s_file, s_buf[flush_buf], BUF_SIZE, &bw);
+        FRESULT res = f_write(&s_file, s_buf[flush_buf], flush_len, &bw);
 
-        if (res == FR_OK && bw == BUF_SIZE)
+        if (res == FR_OK && bw == flush_len)
         {
             f_sync(&s_file);
             s_bytes += bw;

@@ -30,7 +30,6 @@ enum class LogMsgId : uint8_t
     BARO    = 0x04,
     MAG     = 0x05,
     EVENT   = 0x06,
-    PARAMS  = 0x07,
 };
 
 /* ── Common header (5 bytes) ──────────────────────────────────────────────── */
