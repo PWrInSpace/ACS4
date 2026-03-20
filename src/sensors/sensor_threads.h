@@ -11,7 +11,7 @@
  *     Triggered by DRDY interrupt (PAL_USE_WAIT) or 1 ms polling fallback.
  *
  *   SensorPollThread prio 180 (ABOVE_NORM) 100 Hz  2 KB stack
- *     Drives MS5611 state machine (~50 Hz output).
+ *     Drives MS5611 state machine (50 Hz output at OSR 4096).
  *     Reads MMC5983MA magnetometer (100 Hz continuous mode).
  *     Pushes baro + mag data to SensorHub.
  *

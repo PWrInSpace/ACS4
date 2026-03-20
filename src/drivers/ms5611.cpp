@@ -240,7 +240,8 @@ void Ms5611::compute_and_publish()
 
 /* ============================
  * Nieblokujaca maszyna stanow
- * ============================ */
+ * ============================
+ */
 
 void Ms5611::update()
 {
@@ -266,41 +267,33 @@ void Ms5611::update()
 
         case State::WAIT_D1:
         {
-            const uint32_t elapsed = timestamp_us() - conv_start_us_;
-            if (elapsed >= conv_time_us_)
+            if (timestamp_us() - conv_start_us_ < conv_time_us_)
             {
-                state_ = State::READ_D1;
+                break;
             }
-            break;
-        }
 
-        case State::READ_D1:
-        {
             if (!read_adc(raw_d1_))
             {
                 report_error();
-                state_ = State::CONVERT_D1; /* retry od poczatku */
+                state_ = State::CONVERT_D1;
                 return;
             }
 
-            /* Zero ADC wynik oznacza ze konwersja nie byla gotowa lub sie nie rozpoczela. */
             if (raw_d1_ == 0)
             {
                 state_ = State::CONVERT_D1;
                 return;
             }
 
-            state_ = State::CONVERT_D2;
-            break;
-        }
-
-        case State::CONVERT_D2:
-        {
-            const uint8_t cmd = CMD_CONVERT_D2 + static_cast<uint8_t>(osr_);
-            if (!send_command(cmd))
+            /* Natychmiast rozpocznij konwersje D2 */
             {
-                report_error();
-                return;
+                const uint8_t cmd = CMD_CONVERT_D2 + static_cast<uint8_t>(osr_);
+                if (!send_command(cmd))
+                {
+                    report_error();
+                    state_ = State::CONVERT_D1;
+                    return;
+                }
             }
             conv_start_us_ = timestamp_us();
             state_         = State::WAIT_D2;
@@ -309,16 +302,11 @@ void Ms5611::update()
 
         case State::WAIT_D2:
         {
-            const uint32_t elapsed = timestamp_us() - conv_start_us_;
-            if (elapsed >= conv_time_us_)
+            if (timestamp_us() - conv_start_us_ < conv_time_us_)
             {
-                state_ = State::READ_D2;
+                break;
             }
-            break;
-        }
 
-        case State::READ_D2:
-        {
             if (!read_adc(raw_d2_))
             {
                 report_error();
@@ -334,8 +322,18 @@ void Ms5611::update()
 
             compute_and_publish();
 
-            /* Zloopbackuj do poczatku nowego cyklu */
-            state_ = State::CONVERT_D1;
+            /* Natychmiast rozpocznij nastepny cykl D1 */
+            {
+                const uint8_t cmd = CMD_CONVERT_D1 + static_cast<uint8_t>(osr_);
+                if (!send_command(cmd))
+                {
+                    report_error();
+                    state_ = State::CONVERT_D1;
+                    return;
+                }
+            }
+            conv_start_us_ = timestamp_us();
+            state_         = State::WAIT_D1;
             break;
         }
 
