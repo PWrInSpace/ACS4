@@ -6,8 +6,8 @@
  *   Pushes accel+gyro+temp into SensorHub.
  *
  * SensorPollThread (100 Hz, prio 180):
- *   Ticks MS5611 state machine; reads completed baro samples.
- *   Reads MMC5983MA in continuous mode.
+ *   Ticks MS5611 state machine (50 Hz output at OSR 4096).
+ *   Reads MMC5983MA in continuous mode (100 Hz).
  *   Pushes baro+mag into SensorHub.
  */
 

@@ -118,9 +118,10 @@ class Ms5611
     /**
      * @brief Non-blocking state machine tick.
      *
-     * Call at a regular rate (≥ 100 Hz). The state machine issues
-     * conversion commands and reads results without blocking.
-     * A full pressure+temperature cycle takes ~20 ms at OSR 4096.
+     * Call at a regular rate (≥ 100 Hz). The state machine pipelines
+     * ADC reads with the next conversion command in the same tick,
+     * so a full P+T cycle completes in 2 ticks (~20 ms at 100 Hz
+     * with OSR 4096), yielding ~50 Hz output.
      *
      * When a complete sample is ready, has_new_data() becomes true.
      */
@@ -173,12 +174,9 @@ class Ms5611
     enum class State : uint8_t
     {
         IDLE,       /* not yet initialized */
-        CONVERT_D1, /* send pressure conversion command */
-        WAIT_D1,    /* wait for pressure ADC */
-        READ_D1,    /* read pressure result */
-        CONVERT_D2, /* send temperature conversion command */
-        WAIT_D2,    /* wait for temperature ADC */
-        READ_D2,    /* read temperature result + compute */
+        CONVERT_D1, /* send D1 conversion command (entry point only) */
+        WAIT_D1,    /* wait for D1 → read D1 + send D2 */
+        WAIT_D2,    /* wait for D2 → read D2 + compute + send D1 */
     };
 
     /* Computation helpers */
