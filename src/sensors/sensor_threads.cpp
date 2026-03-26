@@ -56,7 +56,7 @@ static THD_FUNCTION(ImuThread, arg)
 
 #if PAL_USE_WAIT == TRUE
     palSetLineMode(LINE_IMU_INT1, PAL_MODE_INPUT);
-    palEnableLineEvent(LINE_IMU_INT1, PAL_EVENT_MODE_RISING_EDGE);
+    palEnableLineEvent(LINE_IMU_INT1, PAL_EVENT_MODE_RISING_EDGE); // NOLINT(cppcoreguidelines-avoid-do-while)
 #else
     systime_t next = chVTGetSystemTimeX();
 #endif
