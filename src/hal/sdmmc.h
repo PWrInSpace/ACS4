@@ -13,8 +13,6 @@
 
 extern "C" {
 #include "hal.h"
-
-#include "ff.h"
 }
 
 namespace acs
@@ -22,9 +20,8 @@ namespace acs
 
 /**
  * @brief Initialize SDMMC1 peripheral and start the SDC driver.
- * @return true if the SDC driver started successfully.
  */
-bool sdmmc_init();
+void sdmmc_init();
 
 /**
  * @brief Mount the FatFs filesystem (must call sdmmc_init first).
@@ -54,10 +51,5 @@ void sdmmc_unmount();
  * @return true on success.
  */
 bool sdmmc_free_space(uint32_t &total_mb, uint32_t &free_mb);
-
-/**
- * @brief Get the internal FatFs filesystem object (for direct f_open etc).
- */
-[[nodiscard]] FATFS *sdmmc_fatfs();
 
 }  // namespace acs

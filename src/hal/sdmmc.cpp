@@ -10,6 +10,8 @@
 
 extern "C" {
 #include "ch.h"
+
+#include "ff.h"
 }
 
 namespace acs
@@ -18,10 +20,9 @@ namespace acs
 static FATFS s_fs;
 static bool  s_mounted = false;
 
-bool sdmmc_init()
+void sdmmc_init()
 {
     sdcStart(&SDCD1, nullptr);
-    return true;
 }
 
 bool sdmmc_mount()
@@ -42,7 +43,7 @@ bool sdmmc_mount()
         return false;
     }
 
-    FRESULT res = f_mount(&s_fs, "/", 1);
+    const FRESULT res = f_mount(&s_fs, "/", 1);
     if (res != FR_OK)
     {
         sdcDisconnect(&SDCD1);
@@ -85,24 +86,19 @@ bool sdmmc_free_space(uint32_t &total_mb, uint32_t &free_mb)
 
     FATFS  *fs   = nullptr;
     DWORD   fre  = 0;
-    FRESULT res  = f_getfree("/", &fre, &fs);
+    const FRESULT res  = f_getfree("/", &fre, &fs);
     if (res != FR_OK)
     {
         return false;
     }
 
-    uint32_t sector_size  = 512;
-    uint32_t cluster_size = static_cast<uint32_t>(fs->csize) * sector_size;
+    constexpr uint32_t sector_size  = FF_MAX_SS;
+    const uint32_t     cluster_size = static_cast<uint32_t>(fs->csize) * sector_size;
 
     total_mb = static_cast<uint32_t>((static_cast<uint64_t>(fs->n_fatent - 2) * cluster_size) >> 20U);
     free_mb  = static_cast<uint32_t>((static_cast<uint64_t>(fre) * cluster_size) >> 20U);
 
     return true;
-}
-
-FATFS *sdmmc_fatfs()
-{
-    return s_mounted ? &s_fs : nullptr;
 }
 
 }  // namespace acs

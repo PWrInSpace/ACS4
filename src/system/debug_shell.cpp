@@ -28,9 +28,12 @@ extern "C" {
 #include "sensors/sensor_hub.h"
 
 #if defined(STM32H725xx)
-    #include "hal/sdmmc.h"
-    #include "logger/flight_logger.h"
-    #include "logger/ram_log.h"
+extern "C" {
+#include "ff.h"
+}
+#include "hal/sdmmc.h"
+#include "logger/flight_logger.h"
+#include "logger/ram_log.h"
 #endif
 #include "system/error_handler.h"
 #include "system/params.h"
@@ -400,6 +403,39 @@ static void cmd_log(BaseSequentialStream *chp, int argc, char *argv[])
     }
 }
 
+static void cmd_sd_ls(BaseSequentialStream *chp)
+{
+    if (!acs::sdmmc_is_mounted())
+    {
+        chprintf(chp, "SD not mounted\r\n");
+        return;
+    }
+
+    DIR dir;
+    FILINFO fno;
+    FRESULT res = f_opendir(&dir, "/");
+    if (res != FR_OK)
+    {
+        chprintf(chp, "Failed to open root dir\r\n");
+        return;
+    }
+
+    chprintf(chp, "%-20s %10s\r\n", "Name", "Size");
+    chprintf(chp, "-------------------------------\r\n");
+
+    while (true)
+    {
+        res = f_readdir(&dir, &fno);
+        if (res != FR_OK || fno.fname[0] == '\0')
+        {
+            break;
+        }
+        chprintf(chp, "%-20s %10lu\r\n", fno.fname, fno.fsize);
+    }
+
+    f_closedir(&dir);
+}
+
 static void cmd_sd(BaseSequentialStream *chp, int argc, char *argv[])
 {
     if (argc == 0)
@@ -442,35 +478,7 @@ static void cmd_sd(BaseSequentialStream *chp, int argc, char *argv[])
     }
     else if (strcmp(argv[0], "ls") == 0)
     {
-        if (!acs::sdmmc_is_mounted())
-        {
-            chprintf(chp, "SD not mounted\r\n");
-            return;
-        }
-
-        DIR dir;
-        FILINFO fno;
-        FRESULT res = f_opendir(&dir, "/");
-        if (res != FR_OK)
-        {
-            chprintf(chp, "Failed to open root dir\r\n");
-            return;
-        }
-
-        chprintf(chp, "%-20s %10s\r\n", "Name", "Size");
-        chprintf(chp, "-------------------------------\r\n");
-
-        while (true)
-        {
-            res = f_readdir(&dir, &fno);
-            if (res != FR_OK || fno.fname[0] == '\0')
-            {
-                break;
-            }
-            chprintf(chp, "%-20s %10lu\r\n", fno.fname, fno.fsize);
-        }
-
-        f_closedir(&dir);
+        cmd_sd_ls(chp);
     }
     else
     {

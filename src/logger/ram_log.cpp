@@ -6,6 +6,8 @@
 
 #include <cstring>
 
+#include "logger/log_format.h"
+
 extern "C" {
 #include "ch.h"
 
@@ -37,7 +39,7 @@ void ram_log_push(const void *data, size_t len)
 
     const auto *src = static_cast<const uint8_t *>(data);
 
-    size_t remaining = RAM_LOG_SIZE - s_head;
+    const size_t remaining = RAM_LOG_SIZE - s_head;
     if (len <= remaining)
     {
         memcpy(&s_ram_buf[s_head], src, len);
@@ -73,8 +75,9 @@ void ram_log_print_status(BaseSequentialStream *chp)
 
     if (s_used > 0)
     {
-        uint32_t est_records = static_cast<uint32_t>(s_used) / 17;
-        chprintf(chp, "~%lu records (avg 17B)\r\n", est_records);
+        const uint32_t est_records = static_cast<uint32_t>(s_used) / sizeof(LogImu);
+        chprintf(chp, "~%lu records (avg %uB)\r\n", est_records,
+                 sizeof(LogImu));
     }
 }
 
