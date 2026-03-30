@@ -79,8 +79,11 @@ git submodule update --init --recursive
 # Default: NUCLEO-H723ZG (dev board)
 make build
 
-# Production PCB (STM32H725)
+# Production PCB (STM32H725) Sigman Layout
 make build TARGET=CUSTOM_H725
+
+# Production PCB (STM432H725) Jedrzej Layout
+make build TARGET=CUSTOM_H725_JEDRZEJ
 ```
 
 ### Flash

@@ -19,10 +19,11 @@ project(acs4
 set(CHIBIOS ${CMAKE_CURRENT_SOURCE_DIR}/lib/chibios)
 
 # ── Target board selection ────────────────────────────────────────────────
-# NUCLEO_H723 = NUCLEO-144 dev board (STM32H723ZGT6)
-# CUSTOM_H725 = Production PCB       (STM32H725VGT6)
-set(ACS4_TARGET "NUCLEO_H723" CACHE STRING "Target board: NUCLEO_H723 | CUSTOM_H725")
-set_property(CACHE ACS4_TARGET PROPERTY STRINGS NUCLEO_H723 CUSTOM_H725)
+# NUCLEO_H723       = NUCLEO-144 dev board        (STM32H723ZGT6)
+# CUSTOM_H725       = Production PCB, Sigman layout (STM32H725VGT6)
+# CUSTOM_H725_JEDRZEJ = Production PCB, Jedrzej layout (STM32H725VGT6)
+set(ACS4_TARGET "NUCLEO_H723" CACHE STRING "Target board: NUCLEO_H723 | CUSTOM_H725 | CUSTOM_H725_JEDRZEJ")
+set_property(CACHE ACS4_TARGET PROPERTY STRINGS NUCLEO_H723 CUSTOM_H725 CUSTOM_H725_JEDRZEJ)
 
 if(ACS4_TARGET STREQUAL "NUCLEO_H723")
     message(STATUS "Target: NUCLEO-144 H723ZG (dev)")
@@ -32,14 +33,21 @@ if(ACS4_TARGET STREQUAL "NUCLEO_H723")
     set(CONFDIR    ${CMAKE_CURRENT_SOURCE_DIR}/cfg/nucleo_h723)
     set(MCU_DEFINE STM32H723xx)
 elseif(ACS4_TARGET STREQUAL "CUSTOM_H725")
-    message(STATUS "Target: ACS4 custom PCB H725VG (prod)")
+    message(STATUS "Target: ACS4 custom PCB H725VG — Sigman layout (prod)")
     set(LINKER_SCRIPT
         ${CHIBIOS}/os/common/startup/ARMCMx/compilers/GCC/ld/STM32H723xG_ITCM64k.ld)
     set(BOARD_DIR  ${CMAKE_CURRENT_SOURCE_DIR}/cfg/boards/ACS4_H725)
     set(CONFDIR    ${CMAKE_CURRENT_SOURCE_DIR}/cfg/custom_h725)
     set(MCU_DEFINE STM32H725xx)
+elseif(ACS4_TARGET STREQUAL "CUSTOM_H725_JEDRZEJ")
+    message(STATUS "Target: ACS4 custom PCB H725VG — Jedrzej layout (prod)")
+    set(LINKER_SCRIPT
+        ${CHIBIOS}/os/common/startup/ARMCMx/compilers/GCC/ld/STM32H723xG_ITCM64k.ld)
+    set(BOARD_DIR  ${CMAKE_CURRENT_SOURCE_DIR}/cfg/boards/ACS4_H725_JEDRZEJ)
+    set(CONFDIR    ${CMAKE_CURRENT_SOURCE_DIR}/cfg/custom_h725)
+    set(MCU_DEFINE STM32H725xx)
 else()
-    message(FATAL_ERROR "Unknown ACS4_TARGET '${ACS4_TARGET}'. Use NUCLEO_H723 or CUSTOM_H725.")
+    message(FATAL_ERROR "Unknown ACS4_TARGET '${ACS4_TARGET}'. Use NUCLEO_H723, CUSTOM_H725, or CUSTOM_H725_JEDRZEJ.")
 endif()
 
 # =============================================================================
