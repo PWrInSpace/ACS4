@@ -3,6 +3,7 @@
 # =============================================================================
 
 BUILD_DIR   ?= build
+# TARGET: NUCLEO_H723 | CUSTOM_H725 (Sigman) | CUSTOM_H725_JEDRZEJ (Jedrzej)
 TARGET      ?= NUCLEO_H723
 CMAKE_FLAGS ?=
 
