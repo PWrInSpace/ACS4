@@ -20,7 +20,21 @@ SensorHub &sensor_hub()
     return g_hub;
 }
 
-/* IMU (identity transform — board frame == IMU frame) */
+/* IMU (sensor frame → board frame)
+ *
+ * Board frame (target for all layouts):
+ *   X+ = right,  Y+ = forward,  Z+ = up
+ *
+ * Sigman layout — IIM-42653 native frame == board frame:
+ *   identity transform.
+ *
+ * Jedrzej layout — IIM-42653 native frame:
+ *   X+ = backward,  Y+ = right,  Z+ = up
+ *   Rotation:
+ *     board_x = +sensor_y
+ *     board_y = -sensor_x
+ *     board_z = +sensor_z
+ */
 
 void SensorHub::update_imu(const std::array<float, 3> &accel_mps2,
                            const std::array<float, 3> &gyro_rads,
@@ -28,8 +42,17 @@ void SensorHub::update_imu(const std::array<float, 3> &accel_mps2,
                            uint32_t                    timestamp_us)
 {
     chSysLock();
-    data_.accel_mps2       = accel_mps2;
-    data_.gyro_rads        = gyro_rads;
+#ifdef ACS4_LAYOUT_JEDRZEJ
+    data_.accel_mps2[0] = +accel_mps2[1];
+    data_.accel_mps2[1] = -accel_mps2[0];
+    data_.accel_mps2[2] = +accel_mps2[2];
+    data_.gyro_rads[0]  = +gyro_rads[1];
+    data_.gyro_rads[1]  = -gyro_rads[0];
+    data_.gyro_rads[2]  = +gyro_rads[2];
+#else
+    data_.accel_mps2 = accel_mps2;
+    data_.gyro_rads  = gyro_rads;
+#endif
     data_.imu_temp_c       = temp_c;
     data_.imu_timestamp_us = timestamp_us;
     data_.imu_valid        = true;
@@ -55,26 +78,37 @@ void SensorHub::update_baro(float    pressure_pa,
 
 /* Magnetometr (sensor frame → board frame)
  *
- * Sensor natywnie (MMC5983MA, pin-1 upper-left, after SET):
- *   X+ = backward,  Y+ = right,  Z+ = down
- *
- * Board frame (= IMU frame):
+ * Board frame (target for all layouts):
  *   X+ = right,  Y+ = forward,  Z+ = up
  *
- * Rotation:
- *   board_x = +sensor_y
- *   board_y = -sensor_x
- *   board_z = -sensor_z
+ * Sigman layout — MMC5983MA native (pin-1 upper-left, after SET):
+ *   X+ = backward,  Y+ = right,  Z+ = down
+ *   Rotation:
+ *     board_x = +sensor_y
+ *     board_y = -sensor_x
+ *     board_z = -sensor_z
  *
+ * Jedrzej layout — MMC5983MA native:
+ *   X+ = forward,  Y+ = left,  Z+ = down
+ *   Rotation:
+ *     board_x = -sensor_y
+ *     board_y = +sensor_x
+ *     board_z = -sensor_z
  */
 
 void SensorHub::update_mag(const std::array<float, 3> &mag_raw_ut,
                            uint32_t                    timestamp_us)
 {
     chSysLock();
-    data_.mag_ut[0]         = +mag_raw_ut[1];
-    data_.mag_ut[1]         = -mag_raw_ut[0];
-    data_.mag_ut[2]         = -mag_raw_ut[2];
+#ifdef ACS4_LAYOUT_JEDRZEJ
+    data_.mag_ut[0] = -mag_raw_ut[1];
+    data_.mag_ut[1] = +mag_raw_ut[0];
+    data_.mag_ut[2] = -mag_raw_ut[2];
+#else
+    data_.mag_ut[0] = +mag_raw_ut[1];
+    data_.mag_ut[1] = -mag_raw_ut[0];
+    data_.mag_ut[2] = -mag_raw_ut[2];
+#endif
     data_.mag_timestamp_us  = timestamp_us;
     data_.mag_valid         = true;
     data_.mag_fresh         = true;

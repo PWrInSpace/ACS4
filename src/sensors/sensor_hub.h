@@ -64,7 +64,13 @@ class SensorHub
     SensorHub &operator=(const SensorHub &) = delete;
 
     /**
-     * @brief Store a new IMU sample (board frame, no transform needed).
+     * @brief Store a new IMU sample in sensor-native frame.
+     *
+     * The hub applies the IMU→board rotation internally. The rotation is
+     * selected at compile time:
+     *   - default (Sigman):    identity (sensor frame == board frame)
+     *   - ACS4_LAYOUT_JEDRZEJ: board_x = +sensor_y, board_y = -sensor_x,
+     *                          board_z = +sensor_z
      *
      * Called from ImuThread at up to 1 kHz.
      */
@@ -86,8 +92,12 @@ class SensorHub
     /**
      * @brief Store a new magnetometer sample in sensor-native frame.
      *
-     * The hub applies the MAG→board rotation internally:
-     *   board_x = +mag_y,  board_y = -mag_x,  board_z = -mag_z
+     * The hub applies the MAG→board rotation internally. The rotation is
+     * selected at compile time:
+     *   - default (Sigman):    board_x = +mag_y, board_y = -mag_x,
+     *                          board_z = -mag_z
+     *   - ACS4_LAYOUT_JEDRZEJ: board_x = -mag_y, board_y = +mag_x,
+     *                          board_z = -mag_z
      *
      * @param mag_raw_ut  XYZ in MMC5983MA sensor frame (µT).
      */
