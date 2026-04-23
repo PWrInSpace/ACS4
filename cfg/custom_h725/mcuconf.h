@@ -53,12 +53,19 @@
 /*
  * PWR system settings.
  * VOS Scale 0 required for 550 MHz operation.
- * SMPSEN (SMPS Enable) for H725 power supply config.
+ *
+ * Board power topology: SMPS at 2.5 V supplies LDO (pin 11 VDDSMPS from 3V3,
+ * pin 10 VLXSMPS through L2 to VFB node, pin 12 VFBSMPS and pins 46/74/99
+ * VDDLDO all tied to VFB, VCAP on pins 44/72/97 to GND). Both SMPS and LDO
+ * must be enabled or VCORE never comes up and the MCU brown-out resets.
  */
 #define STM32_VOS                           STM32_VOS_SCALE0
 #define STM32_PWR_CR1                       (PWR_CR1_SVOS_1 | PWR_CR1_SVOS_0)
 #define STM32_PWR_CR2                       (PWR_CR2_BREN)
-#define STM32_PWR_CR3                       (PWR_CR3_SMPSEN | PWR_CR3_USB33DEN)
+#define STM32_PWR_CR3                       (PWR_CR3_SMPSLEVEL_1 |          \
+                                             PWR_CR3_SMPSEN     |          \
+                                             PWR_CR3_LDOEN      |          \
+                                             PWR_CR3_USB33DEN)
 #define STM32_PWR_CPUCR                     0
 
 /*
