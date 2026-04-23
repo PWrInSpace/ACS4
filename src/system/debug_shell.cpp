@@ -22,13 +22,16 @@ extern "C" {
 #include "shell.h"
 }
 
+#include "actuators/actuator_hub.h"
 #include "drivers/iim42653.h"
 #include "drivers/mmc5983ma.h"
 #include "drivers/ms5611.h"
+#include "drivers/servo_t75.h"
 #include "sensors/sensor_hub.h"
 #include "system/error_handler.h"
 #include "system/params.h"
 #include "utils/profiler.h"
+#include "utils/timestamp.h"
 
 /* Wersja o info */
 
@@ -314,6 +317,207 @@ static void cmd_sensor_mag(BaseSequentialStream *chp)
     chprintf(chp, "Errors:     %lu\r\n", mag->error_count());
 }
 
+/* Servo bank command (4-aileron canard).
+ *
+ * Public-facing fin numbering is 1..4 (matches PCB silkscreen CH1..CH4_PWM).
+ * Internally fins are 0..3 — convert at the shell boundary.
+ */
+
+static bool parse_fin_arg(BaseSequentialStream *chp, const char *arg, uint8_t &fin_idx)
+{
+    char *endptr = nullptr;
+    long  val    = strtol(arg, &endptr, 10);
+    if (endptr == arg || val < 1 || val > 4)
+    {
+        chprintf(chp, "Invalid fin: %s (expected 1..4)\r\n", arg);
+        return false;
+    }
+    fin_idx = static_cast<uint8_t>(val - 1);
+    return true;
+}
+
+static void cmd_servo_status(BaseSequentialStream *chp)
+{
+    auto *bank = acs::servo_bank_instance();
+    if (bank == nullptr)
+    {
+        chprintf(chp, "SERVOS not available (no hardware or init failed)\r\n");
+        return;
+    }
+
+    const acs::ActuatorSnapshot snap = acs::actuator_hub().snapshot();
+    const bool                  armed = bank->is_armed();
+
+    chprintf(chp,
+             "Servo bank: %s (req=%s)\r\n",
+             armed ? "ARMED" : "DISARMED",
+             snap.armed_request ? "arm" : "disarm");
+    chprintf(chp, "%-4s %-10s %-10s %-10s %-6s %s\r\n",
+             "fin", "cmd_deg", "target_us", "current_us", "ch", "sweep");
+    for (uint8_t i = 0; i < acs::kAileronCount; ++i)
+    {
+        chprintf(chp,
+                 "%-4u %+10.2f %10u %10u %-6u %s\r\n",
+                 static_cast<unsigned>(i + 1),
+                 static_cast<double>(snap.aileron_cmd_deg[i]),
+                 static_cast<unsigned>(bank->target_pulse_us(i)),
+                 static_cast<unsigned>(snap.aileron_current_us[i]),
+                 static_cast<unsigned>(acs::ServoBankT75::timer_channel_for_fin(i)),
+                 snap.sweep[i].active ? "Y" : "N");
+    }
+}
+
+static void cmd_servo_set(BaseSequentialStream *chp, int argc, char *argv[])
+{
+    if (argc < 3)
+    {
+        chprintf(chp, "Usage: servo set <fin 1..4> <deg>\r\n");
+        return;
+    }
+
+    uint8_t fin = 0;
+    if (!parse_fin_arg(chp, argv[1], fin))
+    {
+        return;
+    }
+
+    char *endptr = nullptr;
+    auto  deg    = static_cast<float>(strtod(argv[2], &endptr));
+    if (endptr == argv[2])
+    {
+        chprintf(chp, "Invalid angle: %s\r\n", argv[2]);
+        return;
+    }
+
+    acs::actuator_hub().set_aileron_deg(fin, deg, acs::timestamp_us());
+    chprintf(chp, "fin %u: cmd %.2f deg\r\n", static_cast<unsigned>(fin + 1), static_cast<double>(deg));
+}
+
+static void cmd_servo_us(BaseSequentialStream *chp, int argc, char *argv[])
+{
+    if (argc < 3)
+    {
+        chprintf(chp, "Usage: servo us <fin 1..4> <pulse_us>\r\n");
+        return;
+    }
+
+    auto *bank = acs::servo_bank_instance();
+    if (bank == nullptr)
+    {
+        chprintf(chp, "SERVOS not available\r\n");
+        return;
+    }
+
+    uint8_t fin = 0;
+    if (!parse_fin_arg(chp, argv[1], fin))
+    {
+        return;
+    }
+
+    char *endptr = nullptr;
+    long  us     = strtol(argv[2], &endptr, 10);
+    if (endptr == argv[2] || us < 0 || us > 0xFFFF)
+    {
+        chprintf(chp, "Invalid pulse: %s\r\n", argv[2]);
+        return;
+    }
+
+    /* Bench override: stop any sweep on this fin, write directly to bank. */
+    acs::actuator_hub().set_sweep(fin, false, 0.0f, 0.0f, 0, 0);
+    bank->set_pulse_us(fin, static_cast<uint16_t>(us));
+    chprintf(chp,
+             "fin %u: target %u us (after hardware clamp)\r\n",
+             static_cast<unsigned>(fin + 1),
+             static_cast<unsigned>(bank->target_pulse_us(fin)));
+}
+
+static void cmd_servo_sweep(BaseSequentialStream *chp, int argc, char *argv[])
+{
+    if (argc < 5)
+    {
+        chprintf(chp, "Usage: servo sweep <fin 1..4> <min_deg> <max_deg> <period_ms>\r\n");
+        chprintf(chp, "       servo sweep <fin 1..4> off\r\n");
+        return;
+    }
+
+    uint8_t fin = 0;
+    if (!parse_fin_arg(chp, argv[1], fin))
+    {
+        return;
+    }
+
+    if (strcmp(argv[2], "off") == 0)
+    {
+        acs::actuator_hub().set_sweep(fin, false, 0.0f, 0.0f, 0, 0);
+        chprintf(chp, "fin %u: sweep off\r\n", static_cast<unsigned>(fin + 1));
+        return;
+    }
+
+    char *e1 = nullptr;
+    char *e2 = nullptr;
+    char *e3 = nullptr;
+    auto  min_deg   = static_cast<float>(strtod(argv[2], &e1));
+    auto  max_deg   = static_cast<float>(strtod(argv[3], &e2));
+    long  period_ms = strtol(argv[4], &e3, 10);
+    if (e1 == argv[2] || e2 == argv[3] || e3 == argv[4] || period_ms <= 0)
+    {
+        chprintf(chp, "Invalid sweep arguments\r\n");
+        return;
+    }
+
+    const auto now_ms = static_cast<uint32_t>(chTimeI2MS(chVTGetSystemTimeX()));
+    acs::actuator_hub().set_sweep(
+        fin, true, min_deg, max_deg, static_cast<uint32_t>(period_ms), now_ms);
+    chprintf(chp,
+             "fin %u: sweep %.2f..%.2f deg, period %ld ms\r\n",
+             static_cast<unsigned>(fin + 1),
+             static_cast<double>(min_deg),
+             static_cast<double>(max_deg),
+             period_ms);
+}
+
+static void cmd_servo(BaseSequentialStream *chp, int argc, char *argv[])
+{
+    if (argc == 0)
+    {
+        chprintf(chp,
+                 "Usage: servo status | arm | disarm | set <fin> <deg> | "
+                 "us <fin> <us> | sweep <fin> <min> <max> <period_ms>\r\n");
+        return;
+    }
+
+    if (strcmp(argv[0], "status") == 0)
+    {
+        cmd_servo_status(chp);
+    }
+    else if (strcmp(argv[0], "arm") == 0)
+    {
+        acs::actuator_hub().set_armed_request(true);
+        chprintf(chp, "Arm request sent.\r\n");
+    }
+    else if (strcmp(argv[0], "disarm") == 0)
+    {
+        acs::actuator_hub().set_armed_request(false);
+        chprintf(chp, "Disarm request sent.\r\n");
+    }
+    else if (strcmp(argv[0], "set") == 0)
+    {
+        cmd_servo_set(chp, argc, argv);
+    }
+    else if (strcmp(argv[0], "us") == 0)
+    {
+        cmd_servo_us(chp, argc, argv);
+    }
+    else if (strcmp(argv[0], "sweep") == 0)
+    {
+        cmd_servo_sweep(chp, argc, argv);
+    }
+    else
+    {
+        chprintf(chp, "Unknown servo subcommand: %s\r\n", argv[0]);
+    }
+}
+
 static void cmd_sensor(BaseSequentialStream *chp, int argc, char *argv[])
 {
     if (argc == 0)
@@ -356,6 +560,7 @@ static const ShellCommand shell_commands[] = {
     { "errors",  cmd_errors},
     {  "param",   cmd_param},
     { "sensor",  cmd_sensor},
+    {  "servo",   cmd_servo},
     {  nullptr,     nullptr}
 };
 
