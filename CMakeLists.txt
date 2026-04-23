@@ -194,6 +194,10 @@ set(APP_SOURCES
     src/drivers/mmc5983ma.cpp
     src/drivers/ms5611.cpp
     src/drivers/ms5611_math.cpp
+    src/drivers/servo_t75.cpp
+    src/drivers/servo_t75_math.cpp
+    src/actuators/actuator_hub.cpp
+    src/actuators/actuator_threads.cpp
     src/system/debug_shell.cpp
     src/system/error_handler.cpp
     src/system/params.cpp

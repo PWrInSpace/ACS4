@@ -25,9 +25,12 @@ extern "C" {
 #include <chprintf.h>
 }
 
+#include "actuators/actuator_hub.h"
+#include "actuators/actuator_threads.h"
 #include "drivers/iim42653.h"
 #include "drivers/mmc5983ma.h"
 #include "drivers/ms5611.h"
+#include "drivers/servo_t75.h"
 #include "sensors/sensor_threads.h"
 #include "system/debug_shell.h"
 #include "system/error_handler.h"
@@ -78,10 +81,11 @@ static const SPIConfig mag_spi_cfg = {
     .cfg2     = SPI_CFG2_CPOL | SPI_CFG2_CPHA, /* SPI Mode 3 */
 };
 
-static acs::SpiBus    g_spi;
-static acs::Iim42653  g_imu;
-static acs::Ms5611    g_baro;
-static acs::Mmc5983ma g_mag;
+static acs::SpiBus       g_spi;
+static acs::Iim42653     g_imu;
+static acs::Ms5611       g_baro;
+static acs::Mmc5983ma    g_mag;
+static acs::ServoBankT75 g_servos;
 
 acs::Iim42653 *acs::imu_instance()
 {
@@ -98,6 +102,11 @@ acs::Mmc5983ma *acs::mag_instance()
     return g_mag.is_initialized() ? &g_mag : nullptr;
 }
 
+acs::ServoBankT75 *acs::servo_bank_instance()
+{
+    return g_servos.is_initialized() ? &g_servos : nullptr;
+}
+
 #else /* NUCLEO — no sensors */
 
 acs::Iim42653 *acs::imu_instance()
@@ -111,6 +120,11 @@ acs::Ms5611 *acs::baro_instance()
 }
 
 acs::Mmc5983ma *acs::mag_instance()
+{
+    return nullptr;
+}
+
+acs::ServoBankT75 *acs::servo_bank_instance()
 {
     return nullptr;
 }
@@ -230,10 +244,24 @@ int main()
     {
         chprintf(serial, "SPI bus: init FAILED\r\n");
     }
+
+    /* TIM4 PWM bank for 4 canard ailerons (PD12..PD15). Boots disarmed:
+     * pins LOW until the flight FSM (or `servo arm` shell cmd) issues arm. */
+    if (g_servos.init(&PWMD4, acs::ServoT75Config::rocket_default()))
+    {
+        chprintf(serial, "SERVOS: TIM4 OK (disarmed)\r\n");
+    }
+    else
+    {
+        chprintf(serial, "SERVOS: init FAILED\r\n");
+    }
 #endif
 
     /* Start sensor acquisition threads (custom PCB only — no-op on Nucleo). */
     acs::start_sensor_threads();
+
+    /* Start actuator write-out thread (custom PCB only — no-op on Nucleo). */
+    acs::start_actuator_threads();
 
     /* Create worker threads. */
     chThdCreateStatic(waBlinker, sizeof(waBlinker), NORMALPRIO, Blinker, nullptr);
