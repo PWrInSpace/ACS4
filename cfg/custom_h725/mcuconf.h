@@ -3,13 +3,13 @@
     Target: STM32H725VGT6 (ACS4 custom PCB)
 
     Clock tree (HSE = 50 MHz passive crystal):
-      PLL1_P = 550 MHz (SYSCLK - max for H725)
-      PLL1_Q = 50 MHz  (SDMMC, SPI1-3)
-      AHB    = 275 MHz (HCLK)
-      APB1   = 137.5 MHz
-      APB2   = 137.5 MHz
-      APB3   = 137.5 MHz
-      APB4   = 137.5 MHz
+      PLL1_P = 240 MHz (SYSCLK)
+      PLL1_Q = 48 MHz  (SDMMC, SPI1-3)
+      AHB    = 240 MHz (HCLK)
+      APB1   = 120 MHz
+      APB2   = 120 MHz
+      APB3   = 120 MHz
+      APB4   = 120 MHz
 
     No LSE — RTC uses LSI (32 kHz internal RC).
 */
@@ -86,14 +86,19 @@
 /*
  * PLLs static settings.
  *
- * PLL1: 50 / 25 * 275 / 1 = 550 MHz (sys_ck)
- *       50 / 25 * 275 / 11 = 50 MHz (PLL1_Q → SDMMC, SPI1-3)
- *       50 / 25 * 275 / 2 = 275 MHz (PLL1_R)
+ * DIVM=5 keeps PLL inputs at 10 MHz (50/5), inside the safe 4..8 MHz / 8..16
+ * MHz PLLRGE bands. Earlier DIVM=25 put inputs at 2 MHz — bottom of the
+ * lowest band — and PLLs sometimes fail to lock there, leaving chSysInit()
+ * hung waiting for PLLxRDY (no LED, no USB enumeration).
  *
- * PLL2: 50 / 25 * 400 / 40 = 20 MHz (PLL2_P → ADC clock)
- *       50 / 25 * 400 / 8  = 100 MHz (PLL2_Q, PLL2_R)
+ * PLL1: 50 / 5 * 24 / 1  = 240 MHz (sys_ck)
+ *       50 / 5 * 24 / 5  = 48 MHz  (PLL1_Q → SDMMC, SPI1-3)
+ *       50 / 5 * 24 / 2  = 120 MHz (PLL1_R)
  *
- * PLL3: 50 / 25 * 400 / 8  = 100 MHz (PLL3_P, PLL3_Q, PLL3_R)
+ * PLL2: 50 / 5 * 80 / 40 = 20 MHz  (PLL2_P → ADC clock)
+ *       50 / 5 * 80 / 8  = 100 MHz (PLL2_Q, PLL2_R)
+ *
+ * PLL3: 50 / 5 * 80 / 8  = 100 MHz (PLL3_P, PLL3_Q, PLL3_R)
  */
 #define STM32_PLLSRC                        STM32_PLLSRC_HSE_CK
 #define STM32_PLLCFGR_MASK                  ~0
@@ -101,18 +106,18 @@
 #define STM32_PLL1_P_ENABLED                TRUE
 #define STM32_PLL1_Q_ENABLED                TRUE
 #define STM32_PLL1_R_ENABLED                TRUE
-#define STM32_PLL1_DIVM_VALUE               25
-#define STM32_PLL1_DIVN_VALUE               275
+#define STM32_PLL1_DIVM_VALUE               5
+#define STM32_PLL1_DIVN_VALUE               24
 #define STM32_PLL1_FRACN_VALUE              0
 #define STM32_PLL1_DIVP_VALUE               1
-#define STM32_PLL1_DIVQ_VALUE               11
+#define STM32_PLL1_DIVQ_VALUE               5
 #define STM32_PLL1_DIVR_VALUE               2
 #define STM32_PLL2_ENABLED                  TRUE
 #define STM32_PLL2_P_ENABLED                TRUE
 #define STM32_PLL2_Q_ENABLED                TRUE
 #define STM32_PLL2_R_ENABLED                TRUE
-#define STM32_PLL2_DIVM_VALUE               25
-#define STM32_PLL2_DIVN_VALUE               400
+#define STM32_PLL2_DIVM_VALUE               5
+#define STM32_PLL2_DIVN_VALUE               80
 #define STM32_PLL2_FRACN_VALUE              0
 #define STM32_PLL2_DIVP_VALUE               40
 #define STM32_PLL2_DIVQ_VALUE               8
@@ -121,8 +126,8 @@
 #define STM32_PLL3_P_ENABLED                TRUE
 #define STM32_PLL3_Q_ENABLED                TRUE
 #define STM32_PLL3_R_ENABLED                TRUE
-#define STM32_PLL3_DIVM_VALUE               25
-#define STM32_PLL3_DIVN_VALUE               400
+#define STM32_PLL3_DIVM_VALUE               5
+#define STM32_PLL3_DIVN_VALUE               80
 #define STM32_PLL3_FRACN_VALUE              0
 #define STM32_PLL3_DIVP_VALUE               8
 #define STM32_PLL3_DIVQ_VALUE               8
@@ -134,7 +139,7 @@
 #define STM32_SW                            STM32_SW_PLL1_P_CK
 #define STM32_RTCSEL                        STM32_RTCSEL_LSI_CK
 #define STM32_D1CPRE                        STM32_D1CPRE_DIV1
-#define STM32_D1HPRE                        STM32_D1HPRE_DIV2
+#define STM32_D1HPRE                        STM32_D1HPRE_DIV1
 #define STM32_D1PPRE3                       STM32_D1PPRE3_DIV2
 #define STM32_D2PPRE1                       STM32_D2PPRE1_DIV2
 #define STM32_D2PPRE2                       STM32_D2PPRE2_DIV2
