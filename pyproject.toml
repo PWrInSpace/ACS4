@@ -1,0 +1,82 @@
+[project]
+name = "acs4-tools"
+version = "0.1.0"
+description = "Ground support tools for the ACS4 flight computer"
+requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "ruff",
+    "mypy",
+]
+plot = [
+    "matplotlib",
+    "numpy",
+    "pandas",
+]
+
+[project.scripts]
+acs4-decode = "tools.log_decoder:main"
+
+# ---------------------------------------------------------------------------
+# ruff
+# ---------------------------------------------------------------------------
+
+[tool.ruff]
+target-version = "py311"
+line-length = 88
+src = ["tools"]
+
+[tool.ruff.lint]
+select = [
+    "E",     # pycodestyle errors
+    "W",     # pycodestyle warnings
+    "F",     # pyflakes
+    "I",     # isort
+    "N",     # pep8-naming
+    "UP",    # pyupgrade
+    "B",     # flake8-bugbear
+    "A",     # flake8-builtins
+    "C4",    # flake8-comprehensions
+    "SIM",   # flake8-simplify
+    "TCH",   # flake8-type-checking
+    "RUF",   # ruff-specific rules
+    "ANN",   # flake8-annotations
+    "S",     # flake8-bandit (security)
+    "PTH",   # flake8-use-pathlib
+]
+ignore = [
+    "ANN401",  # dynamically typed expressions (Any)
+    "S101",    # assert usage
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101", "ANN"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["tools"]
+
+# ---------------------------------------------------------------------------
+# mypy
+# ---------------------------------------------------------------------------
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+
+[[tool.mypy.overrides]]
+module = [
+    "matplotlib.*",
+    "numpy.*",
+    "pandas.*",
+]
+ignore_missing_imports = true

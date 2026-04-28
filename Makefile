@@ -76,11 +76,16 @@ lint:
 		2>&1 | tee build_test/clang-tidy.log
 	@echo "Results saved to build_test/clang-tidy.log"
 
+ARM_SRCS = $$(python3 -c "import json; \
+	root = '$(PROJECT_ROOT)/src/'; \
+	entries = json.load(open('$(BUILD_DIR)/compile_commands.json')); \
+	print(' '.join(e['file'] for e in entries if e['file'].startswith(root)))")
+
 lint-all: build
 	@echo "Running clang-tidy (all src/)..."
 	@clang-tidy -p $(BUILD_DIR) $(EXTRA_ARGS) \
 		--extra-arg=-D__ARM_ARCH=7 \
-		$$(find src -name '*.cpp') \
+		$(ARM_SRCS) \
 		2>&1 | tee $(BUILD_DIR)/clang-tidy.log
 	@echo "Results saved to $(BUILD_DIR)/clang-tidy.log"
 

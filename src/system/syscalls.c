@@ -10,6 +10,8 @@
 #include <errno.h>
 #include <sys/stat.h>
 
+// NOLINTBEGIN(bugprone-reserved-identifier,cert-dcl37-c,cert-dcl51-cpp,readability-non-const-parameter)
+
 int _close(int fd)
 {
     (void)fd;
@@ -65,3 +67,5 @@ int _write(int fd, const char *buf, int len)
     (void)buf;
     return len;
 }
+
+// NOLINTEND(bugprone-reserved-identifier,cert-dcl37-c,cert-dcl51-cpp,readability-non-const-parameter)
