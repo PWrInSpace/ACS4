@@ -28,6 +28,15 @@ extern "C" {
 #include "drivers/ms5611.h"
 #include "drivers/servo_t75.h"
 #include "sensors/sensor_hub.h"
+
+#if defined(STM32H725xx)
+extern "C" {
+#include "ff.h"
+}
+#include "hal/sdmmc.h"
+#include "logger/flight_logger.h"
+#include "logger/ram_log.h"
+#endif
 #include "system/error_handler.h"
 #include "system/params.h"
 #include "utils/profiler.h"
@@ -549,6 +558,140 @@ static void cmd_sensor(BaseSequentialStream *chp, int argc, char *argv[])
     }
 }
 
+#if defined(STM32H725xx)
+
+static void cmd_log(BaseSequentialStream *chp, int argc, char *argv[])
+{
+    if (argc == 0)
+    {
+        chprintf(chp, "Usage: log start | stop | status\r\n");
+        return;
+    }
+
+    if (strcmp(argv[0], "start") == 0)
+    {
+        if (!acs::sdmmc_is_mounted())
+        {
+            chprintf(chp, "SD card not mounted, attempting mount...\r\n");
+            if (!acs::sdmmc_mount())
+            {
+                chprintf(chp, "SD mount FAILED\r\n");
+                return;
+            }
+            chprintf(chp, "SD mounted OK\r\n");
+            acs::logger_init();
+        }
+        if (acs::logger_start())
+        {
+            const acs::LoggerStats st = acs::logger_stats();
+            chprintf(chp, "Logging started -> %s\r\n", st.filename);
+        }
+        else
+        {
+            chprintf(chp, "Failed to start logging\r\n");
+        }
+    }
+    else if (strcmp(argv[0], "stop") == 0)
+    {
+        acs::logger_stop();
+        chprintf(chp, "Logging stopped\r\n");
+    }
+    else if (strcmp(argv[0], "status") == 0)
+    {
+        acs::logger_print_status(chp);
+        acs::ram_log_print_status(chp);
+    }
+    else
+    {
+        chprintf(chp, "Usage: log start | stop | status\r\n");
+    }
+}
+
+static void cmd_sd_ls(BaseSequentialStream *chp)
+{
+    if (!acs::sdmmc_is_mounted())
+    {
+        chprintf(chp, "SD not mounted\r\n");
+        return;
+    }
+
+    DIR dir;
+    FILINFO fno;
+    FRESULT res = f_opendir(&dir, "/");
+    if (res != FR_OK)
+    {
+        chprintf(chp, "Failed to open root dir\r\n");
+        return;
+    }
+
+    chprintf(chp, "%-20s %10s\r\n", "Name", "Size");
+    chprintf(chp, "-------------------------------\r\n");
+
+    while (true)
+    {
+        res = f_readdir(&dir, &fno);
+        if (res != FR_OK || fno.fname[0] == '\0')
+        {
+            break;
+        }
+        chprintf(chp, "%-20s %10lu\r\n", fno.fname, fno.fsize);
+    }
+
+    f_closedir(&dir);
+}
+
+static void cmd_sd(BaseSequentialStream *chp, int argc, char *argv[])
+{
+    if (argc == 0)
+    {
+        chprintf(chp, "Usage: sd status | mount | unmount | ls\r\n");
+        return;
+    }
+
+    if (strcmp(argv[0], "status") == 0)
+    {
+        chprintf(chp, "Card inserted: %s\r\n", acs::sdmmc_card_inserted() ? "yes" : "no");
+        chprintf(chp, "Mounted:       %s\r\n", acs::sdmmc_is_mounted() ? "yes" : "no");
+
+        if (acs::sdmmc_is_mounted())
+        {
+            uint32_t total = 0;
+            uint32_t free_space = 0;
+            if (acs::sdmmc_free_space(total, free_space))
+            {
+                chprintf(chp, "Capacity:      %lu MiB\r\n", total);
+                chprintf(chp, "Free:          %lu MiB\r\n", free_space);
+            }
+        }
+    }
+    else if (strcmp(argv[0], "mount") == 0)
+    {
+        if (acs::sdmmc_mount())
+        {
+            chprintf(chp, "SD card mounted OK\r\n");
+        }
+        else
+        {
+            chprintf(chp, "SD mount FAILED\r\n");
+        }
+    }
+    else if (strcmp(argv[0], "unmount") == 0)
+    {
+        acs::sdmmc_unmount();
+        chprintf(chp, "SD card unmounted\r\n");
+    }
+    else if (strcmp(argv[0], "ls") == 0)
+    {
+        cmd_sd_ls(chp);
+    }
+    else
+    {
+        chprintf(chp, "Usage: sd status | mount | unmount | ls\r\n");
+    }
+}
+
+#endif /* STM32H725xx */
+
 /* Tablica komend shellowych */
 
 static const ShellCommand shell_commands[] = {
@@ -561,6 +704,10 @@ static const ShellCommand shell_commands[] = {
     {  "param",   cmd_param},
     { "sensor",  cmd_sensor},
     {  "servo",   cmd_servo},
+#if defined(STM32H725xx)
+    {    "log",     cmd_log},
+    {     "sd",      cmd_sd},
+#endif
     {  nullptr,     nullptr}
 };
 

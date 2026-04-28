@@ -38,7 +38,10 @@ extern "C" {
 #include "utils/timestamp.h"
 
 #if defined(STM32H725xx)
+    #include "hal/sdmmc.h"
     #include "hal/spi_bus.h"
+    #include "logger/flight_logger.h"
+    #include "logger/ram_log.h"
     #include "system/usb_cdc.h"
 #endif
 
@@ -157,46 +160,25 @@ static THD_FUNCTION(Blinker, arg)
 }
 
 /*---------------------------------------------------------------------------*/
-/* Application entry point                                                   */
+/* Logger thread (custom PCB only — needs SD card)                           */
 /*---------------------------------------------------------------------------*/
 
-int main()
+#if defined(STM32H725xx)
+static THD_WORKING_AREA(waLogger, 2048);
+
+static THD_FUNCTION(LoggerThread, arg)
 {
-    /* HAL initialization, this also initializes the configured device
-     * drivers and performs the board-specific initializations. */
-    halInit();
-
-    /* Kernel initialization, the main() function becomes a thread and
-     * the RTOS is active. */
-    chSysInit();
-
-    /* Enable DWT cycle counter for microsecond timestamps. */
-    acs::timestamp_init();
-
-    /* Start software + hardware watchdog. */
-    acs::watchdog_init();
-
-    /* Start debug shell.
-     * Custom PCB: USB CDC on PA11/PA12 (OTG_HS in FS mode).
-     * Nucleo:     USART3 at 921600 baud via ST-Link VCP. */
-#if defined(STM32H725xx)
-    acs::usb_cdc_init();
-    auto *serial = acs::usb_cdc_stream();
-    acs::shell_start(serial);
-#else
-    acs::shell_start(&SD3, 921600);
-    auto *serial = reinterpret_cast<BaseSequentialStream *>(&SD3);
+    acs::logger_thread(arg);
+}
 #endif
-    chprintf(serial, "\r\n");
-    chprintf(serial, "========================================\r\n");
-    chprintf(serial, "  ACS4 Flight Computer\r\n");
-    chprintf(serial, "  ChibiOS/RT %s\r\n", CH_KERNEL_VERSION);
-    chprintf(serial, "  System clock: %lu MHz\r\n", STM32_SYS_CK / 1000000UL);
-    chprintf(serial, "========================================\r\n");
-    chprintf(serial, "\r\n");
 
-    /* Initialize sensor SPI bus and IMU (custom PCB only). */
+/*---------------------------------------------------------------------------*/
+/* Sensor + SD-card init helpers (custom PCB only)                           */
+/*---------------------------------------------------------------------------*/
+
 #if defined(STM32H725xx)
+static void init_sensors(BaseSequentialStream *serial)
+{
     if (g_spi.init(&SPID2))
     {
         if (g_imu.init(g_spi, LINE_IMU_CS, imu_spi_cfg))
@@ -255,13 +237,80 @@ int main()
     {
         chprintf(serial, "SERVOS: init FAILED\r\n");
     }
+}
+
+static void init_sd_logger(BaseSequentialStream *serial)
+{
+    acs::sdmmc_init();
+    acs::ram_log_init();
+
+    if (acs::sdmmc_mount())
+    {
+        chprintf(serial, "SD:   mounted OK\r\n");
+        acs::logger_init();
+    }
+    else
+    {
+        chprintf(serial, "SD:   mount failed (card %s)\r\n",
+                 acs::sdmmc_card_inserted() ? "detected" : "not detected");
+    }
+
+    chThdCreateStatic(waLogger, sizeof(waLogger), NORMALPRIO - 20, LoggerThread, nullptr);
+}
 #endif
 
-    /* Start sensor acquisition threads (custom PCB only — no-op on Nucleo). */
+/*---------------------------------------------------------------------------*/
+/* Application entry point                                                   */
+/*---------------------------------------------------------------------------*/
+
+int main()
+{
+    /* HAL initialization, this also initializes the configured device
+     * drivers and performs the board-specific initializations. */
+    halInit();
+
+    /* Kernel initialization, the main() function becomes a thread and
+     * the RTOS is active. */
+    chSysInit();
+
+    /* Enable DWT cycle counter for microsecond timestamps. */
+    acs::timestamp_init();
+
+    /* Start software + hardware watchdog. */
+    acs::watchdog_init();
+
+    /* Start debug shell.
+     * Custom PCB: USB CDC on PA11/PA12 (OTG_HS in FS mode).
+     * Nucleo:     USART3 at 921600 baud via ST-Link VCP. */
+#if defined(STM32H725xx)
+    acs::usb_cdc_init();
+    auto *serial = acs::usb_cdc_stream();
+    acs::shell_start(serial);
+#else
+    acs::shell_start(&SD3, 921600);
+    auto *serial = reinterpret_cast<BaseSequentialStream *>(&SD3);
+#endif
+    chprintf(serial, "\r\n");
+    chprintf(serial, "========================================\r\n");
+    chprintf(serial, "  ACS4 Flight Computer\r\n");
+    chprintf(serial, "  ChibiOS/RT %s\r\n", CH_KERNEL_VERSION);
+    chprintf(serial, "  System clock: %lu MHz\r\n", STM32_SYS_CK / 1000000UL);
+    chprintf(serial, "========================================\r\n");
+    chprintf(serial, "\r\n");
+
+    /* Initialize sensors and SD logger (custom PCB only). */
+#if defined(STM32H725xx)
+    init_sensors(serial);
+#endif
+
     acs::start_sensor_threads();
 
     /* Start actuator write-out thread (custom PCB only — no-op on Nucleo). */
     acs::start_actuator_threads();
+
+#if defined(STM32H725xx)
+    init_sd_logger(serial);
+#endif
 
     /* Create worker threads. */
     chThdCreateStatic(waBlinker, sizeof(waBlinker), NORMALPRIO, Blinker, nullptr);

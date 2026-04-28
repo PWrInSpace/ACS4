@@ -1,6 +1,7 @@
 [submodule "lib/chibios"]
 	path = lib/chibios
 	url = https://github.com/ChibiOS/ChibiOS.git
+	ignore = dirty
 [submodule "lib/eigen"]
 	path = lib/eigen
 	url = https://gitlab.com/libeigen/eigen.git

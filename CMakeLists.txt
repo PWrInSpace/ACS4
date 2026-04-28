@@ -183,6 +183,51 @@ set(CHIBIOS_SHELL_C
     ${CHIBIOS}/os/various/shell/shell_cmd.c
 )
 
+# ── FatFs filesystem (from ChibiOS ext — custom PCB only) ────────────
+# ChibiOS ships FatFs as a .7z archive; extract it if not yet present.
+if(ACS4_TARGET STREQUAL "CUSTOM_H725")
+    set(FATFS_SOURCE_DIR ${CHIBIOS}/ext/fatfs/source)
+    if(NOT EXISTS "${FATFS_SOURCE_DIR}/ff.c")
+        message(STATUS "FatFs not found — extracting from archive...")
+        find_program(P7ZIP_EXECUTABLE NAMES 7z 7za 7zr)
+        if(NOT P7ZIP_EXECUTABLE)
+            message(FATAL_ERROR
+                "FatFs archive needs to be extracted but 7-Zip was not found.\n"
+                "Install it and re-run CMake:\n"
+                "  Ubuntu/Debian: sudo apt install p7zip-full\n"
+                "  macOS:         brew install p7zip\n"
+                "  Windows:       winget install 7zip.7zip")
+        endif()
+        execute_process(
+            COMMAND ${P7ZIP_EXECUTABLE} x
+                    "${CHIBIOS}/ext/fatfs-0.14b_patched.7z"
+                    "-o${CHIBIOS}/ext/"
+                    -y
+            RESULT_VARIABLE FATFS_EXTRACT_RESULT
+            OUTPUT_QUIET
+        )
+        if(NOT FATFS_EXTRACT_RESULT EQUAL 0)
+            message(FATAL_ERROR "Failed to extract FatFs archive (exit code ${FATFS_EXTRACT_RESULT}).")
+        endif()
+        message(STATUS "FatFs extracted to ${FATFS_SOURCE_DIR}")
+    endif()
+
+    set(CHIBIOS_FATFS_C
+        ${CHIBIOS}/os/various/fatfs_bindings/fatfs_diskio.c
+        ${CHIBIOS}/os/various/fatfs_bindings/fatfs_syscall.c
+        ${CHIBIOS}/ext/fatfs/source/ff.c
+        ${CHIBIOS}/ext/fatfs/source/ffunicode.c
+    )
+    set(APP_LOGGER_SOURCES
+        src/hal/sdmmc.cpp
+        src/logger/flight_logger.cpp
+        src/logger/ram_log.cpp
+    )
+else()
+    set(CHIBIOS_FATFS_C "")
+    set(APP_LOGGER_SOURCES "")
+endif()
+
 # =============================================================================
 # Application Sources
 # =============================================================================
@@ -298,11 +343,19 @@ add_executable(${PROJECT_NAME}
     ${CHIBIOS_OSLIB_C}
     # C — ChibiOS Shell
     ${CHIBIOS_SHELL_C}
+    # C — FatFs
+    ${CHIBIOS_FATFS_C}
     # C++ — Application
     ${APP_SOURCES}
+    ${APP_LOGGER_SOURCES}
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${CHIBIOS_INCLUDE_DIRS})
+
+if(ACS4_TARGET STREQUAL "CUSTOM_H725")
+    target_include_directories(${PROJECT_NAME} PRIVATE ${CHIBIOS}/ext/fatfs/source)
+endif()
+
 target_compile_definitions(${PROJECT_NAME} PRIVATE
     ${MCU_DEFINE}
     ${BOARD_LAYOUT_DEFINE}
@@ -332,6 +385,13 @@ set_source_files_properties(
     ${CHIBIOS_SHELL_C}
     PROPERTIES COMPILE_OPTIONS "-Wstrict-prototypes"
 )
+
+if(CHIBIOS_FATFS_C)
+    set_source_files_properties(
+        ${CHIBIOS_FATFS_C}
+        PROPERTIES COMPILE_OPTIONS "-Wstrict-prototypes"
+    )
+endif()
 
 # ── C++ flags (application code) ─────────────────────────────────────────
 target_compile_options(${PROJECT_NAME} PRIVATE

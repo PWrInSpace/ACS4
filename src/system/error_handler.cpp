@@ -43,6 +43,7 @@ static constexpr const char *const s_error_names[] = {
     "BARO_COMM_FAIL",
     "MAG_COMM_FAIL",
     "GPS_NO_FIX",
+    "SD_MOUNT_FAIL",
     "SD_WRITE_FAIL",
     "SD_FULL",
     "STACK_OVERFLOW",
